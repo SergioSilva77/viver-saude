@@ -5,7 +5,7 @@ import morgan from 'morgan'
 import multer from 'multer'
 import { z } from 'zod'
 import Stripe from 'stripe'
-import { existsSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { resolve, extname, basename } from 'node:path'
 import {
   getCatalog,
@@ -29,6 +29,9 @@ import {
 // ── Paths ──────────────────────────────────────────────────
 const AI_CONFIG_PATH = resolve(process.cwd(), '.ai-config.json')
 const KNOWLEDGE_DIR = resolve(process.cwd(), 'knowledge')
+
+// Ensure required directories exist on startup
+mkdirSync(KNOWLEDGE_DIR, { recursive: true })
 
 // ── Zod schemas ────────────────────────────────────────────
 const registerSchema = z.object({
