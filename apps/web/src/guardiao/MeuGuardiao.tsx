@@ -39,7 +39,7 @@ interface Props {
 
 // ── Constants ──────────────────────────────────────────────
 
-const API_URL = 'http://localhost:4000'
+const API_URL = ''
 
 // ── Sub-components ─────────────────────────────────────────
 

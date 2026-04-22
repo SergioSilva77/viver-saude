@@ -4,8 +4,8 @@ import { SessionSettings } from './SessionSettings'
 import { KnowledgeUpload } from './KnowledgeUpload'
 import { loadSettings, saveSettings, type AppSettings } from './settingsTypes'
 
-const API_URL = 'http://localhost:4000'
-const ADMIN_TOKEN = 'vs-admin-dev'
+const API_URL = ''
+const ADMIN_TOKEN = import.meta.env.VITE_ADMIN_TOKEN ?? 'vs-admin-dev'
 
 type SyncState = 'idle' | 'syncing' | 'synced' | 'error'
 

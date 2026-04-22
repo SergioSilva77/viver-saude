@@ -177,8 +177,8 @@ function App() {
           {/* ── TOKENS ───────────────────────────────────── */}
           {activeSection === 'tokens' && (
             <TokenUsagePage
-              apiUrl="http://localhost:4000"
-              adminToken="vs-admin-dev"
+              apiUrl=""
+              adminToken={import.meta.env.VITE_ADMIN_TOKEN ?? 'vs-admin-dev'}
             />
           )}
         </div>
