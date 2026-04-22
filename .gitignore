@@ -1,0 +1,19 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+coverage/
+.DS_Store
+apps/*/dist/
+apps/*/node_modules/
+packages/*/dist/
+packages/*/node_modules/
+# Dev-mode shared user store (generated locally, not for commit)
+apps/web/.dev-users.json
+# Internal admin log file (generated locally, not for commit)
+apps/admin/.admin-logs.txt
+# API runtime files (generated locally, sensitive)
+apps/api/.ai-config.json
+apps/api/token-usage.json
+apps/api/knowledge/
