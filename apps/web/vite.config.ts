@@ -165,4 +165,14 @@ export default defineConfig({
       '@viver-saude/shared': resolve(__dirname, '../../packages/shared/src/index.ts'),
     },
   },
+  server: {
+    port: 5173,
+    proxy: {
+      // Forward /api/* to the local API server in development
+      '/api': {
+        target: 'http://localhost:4000',
+        changeOrigin: true,
+      },
+    },
+  },
 })

@@ -3,7 +3,9 @@ import { plans, getEffectivePlanId } from '@viver-saude/shared'
 import { ALL_RESOURCES, type AdminUser } from './types'
 import type { PlanId } from '@viver-saude/shared'
 
-async function registerDevUser(user: {
+const ADMIN_TOKEN = import.meta.env.VITE_ADMIN_TOKEN ?? 'vs-admin-dev'
+
+async function syncUserToApi(user: {
   id: string
   fullName: string
   email: string
@@ -11,13 +13,13 @@ async function registerDevUser(user: {
   password: string
 }) {
   try {
-    await fetch('/__dev__/users', {
+    await fetch('/api/admin/users', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-admin-token': ADMIN_TOKEN },
       body: JSON.stringify(user),
     })
   } catch {
-    // dev store unavailable — silent fail
+    // API unavailable — silent fail
   }
 }
 
@@ -71,15 +73,13 @@ export function CreateUserModal({ onClose, onSave }: Props) {
       payments: [],
     }
 
-    if (password) {
-      await registerDevUser({
-        id: newUser.id,
-        fullName: newUser.fullName,
-        email: newUser.email,
-        planIds: newUser.planIds,
-        password,
-      })
-    }
+    await syncUserToApi({
+      id: newUser.id,
+      fullName: newUser.fullName,
+      email: newUser.email,
+      planIds: newUser.planIds,
+      password,
+    })
 
     onSave(newUser)
   }

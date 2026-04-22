@@ -17,6 +17,7 @@ import {
 import { config, hasStripeConfig, getAiConfig } from './config.js'
 import { chat, type ChatMessage, type UserProfile } from './ai.js'
 import { recordUsage, getUsageStats, setQuota } from './tokenTracker.js'
+import { listUsers, upsertUser, removeUser, findByEmail } from './userStore.js'
 import {
   loadManifest,
   removeManifestEntry,
@@ -82,6 +83,19 @@ const aiSettingsSchema = z.object({
   provider: z.enum(['claude', 'gemini']),
   apiKey: z.string().min(10),
   model: z.string().min(3),
+})
+
+const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+})
+
+const createUserSchema = z.object({
+  id: z.string().min(1),
+  email: z.string().email(),
+  fullName: z.string().default(''),
+  planIds: z.array(z.string()).default([]),
+  password: z.string().optional(),
 })
 
 const knowledgeMetaSchema = z.object({
@@ -382,6 +396,60 @@ app.put('/api/admin/token-quota', requireAdminToken, (req, res) => {
     res.json({ ok: true, quota })
   } catch (error) {
     res.status(400).json({ message: error instanceof Error ? error.message : 'Quota inválida.' })
+  }
+})
+
+// ── Auth ───────────────────────────────────────────────────
+app.post('/api/auth/login', (req, res) => {
+  try {
+    const { email, password } = loginSchema.parse(req.body)
+    const user = findByEmail(email)
+
+    if (!user || user.password !== password) {
+      res.status(401).json({ message: 'E-mail ou senha incorretos.' })
+      return
+    }
+
+    res.json({ ok: true, userId: user.id, email: user.email, planIds: user.planIds })
+  } catch (error) {
+    res.status(400).json({ message: error instanceof Error ? error.message : 'Credenciais inválidas.' })
+  }
+})
+
+// ── Admin: user management ─────────────────────────────────
+app.get('/api/admin/users', requireAdminToken, (_req, res) => {
+  try {
+    const users = listUsers().map(({ password: _pw, ...rest }) => rest)
+    res.json({ users })
+  } catch (error) {
+    res.status(500).json({ message: error instanceof Error ? error.message : 'Falha ao listar usuários.' })
+  }
+})
+
+app.post('/api/admin/users', requireAdminToken, (req, res) => {
+  try {
+    const payload = createUserSchema.parse(req.body)
+    const existing = listUsers().find((u) => u.id === payload.id)
+
+    if (!existing && !payload.password) {
+      res.status(400).json({ message: 'Senha obrigatória para novos usuários.' })
+      return
+    }
+
+    const saved = upsertUser(payload)
+    const { password: _pw, ...safe } = saved
+    res.status(201).json({ ok: true, user: safe })
+  } catch (error) {
+    res.status(400).json({ message: error instanceof Error ? error.message : 'Falha ao salvar usuário.' })
+  }
+})
+
+app.delete('/api/admin/users/:id', requireAdminToken, (req, res) => {
+  try {
+    removeUser(String(req.params.id))
+    res.json({ ok: true })
+  } catch (error) {
+    res.status(500).json({ message: error instanceof Error ? error.message : 'Falha ao remover usuário.' })
   }
 })
 

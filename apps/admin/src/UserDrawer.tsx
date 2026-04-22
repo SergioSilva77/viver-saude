@@ -3,6 +3,8 @@ import { plans, getEffectivePlanId } from '@viver-saude/shared'
 import type { AdminUser, ResourceOverride, ResourceToggle, UserStatus } from './types'
 import type { PlanId } from '@viver-saude/shared'
 
+const ADMIN_TOKEN = import.meta.env.VITE_ADMIN_TOKEN ?? 'vs-admin-dev'
+
 interface Props {
   user: AdminUser
   onClose: () => void
@@ -75,15 +77,15 @@ export function UserDrawer({ user, onClose, onUpdate }: Props) {
     }
     onUpdate(updated)
 
-    // Sync planIds to dev store so the web app session picks it up on next login
+    // Sync planIds to API store so the web app picks them up on next login
     try {
-      await fetch('/__dev__/users', {
+      await fetch('/api/admin/users', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-admin-token': ADMIN_TOKEN },
         body: JSON.stringify({ id: user.id, email: user.email, planIds: grantPlans }),
       })
     } catch {
-      // dev store unavailable — silent fail
+      // API unavailable — silent fail
     }
   }
 

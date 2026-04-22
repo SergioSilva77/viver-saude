@@ -65,6 +65,12 @@ export default defineConfig({
   server: {
     port: 5174,
     proxy: {
+      // Forward /api/* to the local API server in development
+      '/api': {
+        target: 'http://localhost:4000',
+        changeOrigin: true,
+      },
+      // Keep dev-store bridge for web app auth plugin (dev only)
       '/__dev__': {
         target: 'http://localhost:5173',
         changeOrigin: true,

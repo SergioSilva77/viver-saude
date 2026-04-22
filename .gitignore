@@ -16,4 +16,5 @@ apps/admin/.admin-logs.txt
 # API runtime files (generated locally, sensitive)
 apps/api/.ai-config.json
 apps/api/token-usage.json
+apps/api/users.json
 apps/api/knowledge/

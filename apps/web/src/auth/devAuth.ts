@@ -1,10 +1,10 @@
 /**
- * Dev-mode authentication: validates credentials against the Vite dev store.
+ * Dev-mode authentication: validates credentials against the backend API.
  *
- * The web app's Vite server exposes /__dev__/auth which reads from
- * .dev-users.json — a file written by the admin panel when creating users.
+ * Calls POST /api/auth/login — proxied to localhost:4000 in development (via
+ * Vite proxy) and handled by Nginx in production.
  *
- * Only active when Supabase is not configured. Never runs in production.
+ * Only active when Supabase is not configured.
  */
 
 import type { PlanId } from '@viver-saude/shared'
@@ -19,7 +19,7 @@ export interface DevAuthResult {
 
 export async function devAuthenticate(email: string, password: string): Promise<DevAuthResult> {
   try {
-    const res = await fetch('/__dev__/auth', {
+    const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
@@ -27,14 +27,14 @@ export async function devAuthenticate(email: string, password: string): Promise<
 
     const data = await res.json() as {
       ok?: boolean
-      error?: string
+      message?: string
       userId?: string
       email?: string
       planIds?: string[]
     }
 
     if (!res.ok || !data.ok) {
-      return { ok: false, error: data.error ?? 'Credenciais inválidas.' }
+      return { ok: false, error: data.message ?? 'Credenciais inválidas.' }
     }
 
     return {
@@ -46,7 +46,7 @@ export async function devAuthenticate(email: string, password: string): Promise<
   } catch {
     return {
       ok: false,
-      error: 'Não foi possível conectar ao servidor local. O web app (5173) está rodando?',
+      error: 'Não foi possível conectar ao servidor. Verifique sua conexão.',
     }
   }
 }
