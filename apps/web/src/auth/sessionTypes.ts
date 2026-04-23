@@ -9,6 +9,11 @@ export interface Session {
   planIds: PlanId[]
   expiresAt: number
   /**
+   * Per-plan expiry timestamps in ms.
+   * Absent or null means lifetime access (one-time payment).
+   */
+  planExpiresAt?: Record<string, number>
+  /**
    * Timestamp (ms) until which MeuGuardião is fully unlocked for Nível 1 users.
    * Set on first login when the user holds nivel1.
    * Null means the 24h window has not been started yet.

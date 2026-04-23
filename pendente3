@@ -1,6 +1,13 @@
-vamos colcocar o consumo por ia. quantos tokens já gastou e quantos ainda tem disponivel no geral
+agora precisamos testar cautelosamente a parte de assinatura. desde cancelamento até assinatura com sucesso
+ao assinar com sucesso o nivel 1, a pessoa sera direcionada para a tela de cadastro e atualizar os dados dela. será dado boas vindas pra ela
+vc vai precisar ser oganizado com webhooks e clareza na organizacao. 
+nao espalhe configuracoes, centralize de forma padrao para boa manutencao futura.
+já configurei os ids no painel admin. agora precisamos testar e validar se ira funcionar ou nao
+apos inseerir os dados na stripe ir com sucesso, precisa marcar no banco que a pessoa pagou aquele nivel.
+no painel admin, colocar quando vai expirar aquele nivel da pessoa.
+quando expirar, tornar a bloquear automaticamente aquele nivel até a pessoa pagar novamente.
 
-saber o consumo por usuarios, quanto o usuario ja gastou
+
 
 
 

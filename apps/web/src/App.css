@@ -2014,3 +2014,71 @@
   color: #7a9a8a;
   line-height: 1.4;
 }
+
+/* ════════════════════════════════════════════════════════════
+   CHECKOUT / PAYMENT SUCCESS
+════════════════════════════════════════════════════════════ */
+
+.payment-success-screen {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #f4f9f6 0%, #ecf5f0 100%);
+  padding: 2rem 1rem;
+}
+
+.payment-success-card {
+  background: white;
+  border-radius: 20px;
+  padding: 2.5rem 2rem;
+  max-width: 400px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(46, 125, 94, 0.12);
+}
+
+.payment-success-icon {
+  font-size: 3.5rem;
+  color: #4caf8c;
+  margin-bottom: 1rem;
+  line-height: 1;
+}
+
+.payment-success-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1a3328;
+  margin-bottom: 0.75rem;
+}
+
+.payment-success-sub {
+  font-size: 0.9rem;
+  color: #5a7a6a;
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+}
+
+.checkout-error-banner {
+  background: #fff3cd;
+  border: 1px solid #f5c542;
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  color: #856404;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.btn-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  vertical-align: middle;
+}

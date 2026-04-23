@@ -14,6 +14,8 @@ export interface DevAuthResult {
   userId?: string
   email?: string
   planIds?: PlanId[]
+  /** Per-plan expiry timestamps in ms (ISO strings converted from API). */
+  planExpiresAt?: Record<string, number>
   error?: string
 }
 
@@ -31,10 +33,17 @@ export async function devAuthenticate(email: string, password: string): Promise<
       userId?: string
       email?: string
       planIds?: string[]
+      planExpiresAt?: Record<string, string>
     }
 
     if (!res.ok || !data.ok) {
       return { ok: false, error: data.message ?? 'Credenciais inválidas.' }
+    }
+
+    // Convert ISO date strings → ms timestamps
+    const planExpiresAt: Record<string, number> = {}
+    for (const [planId, iso] of Object.entries(data.planExpiresAt ?? {})) {
+      if (iso) planExpiresAt[planId] = new Date(iso).getTime()
     }
 
     return {
@@ -42,6 +51,7 @@ export async function devAuthenticate(email: string, password: string): Promise<
       userId: data.userId,
       email: data.email,
       planIds: (data.planIds ?? []) as PlanId[],
+      planExpiresAt,
     }
   } catch {
     return {

@@ -17,4 +17,5 @@ apps/admin/.admin-logs.txt
 apps/api/.ai-config.json
 apps/api/token-usage.json
 apps/api/users.json
+apps/api/.stripe-config.json
 apps/api/knowledge/

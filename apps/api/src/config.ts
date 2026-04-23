@@ -3,8 +3,20 @@ import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type { AiConfig } from './ai.js'
 
-// ── AI config file (written by admin panel) ────────────────
+// ── Config file paths ──────────────────────────────────────
 const AI_CONFIG_PATH = resolve(process.cwd(), '.ai-config.json')
+const STRIPE_CONFIG_PATH = resolve(process.cwd(), '.stripe-config.json')
+
+// ── Stripe config shape (file) ─────────────────────────────
+export interface StripeFileConfig {
+  secretKey: string
+  webhookSecret: string
+  priceIdNivel1: string
+  priceIdNivel2: string
+  priceIdNivel3: string
+}
+
+// ── File readers ───────────────────────────────────────────
 
 function readAiConfigFile(): Partial<AiConfig> {
   try {
@@ -15,24 +27,43 @@ function readAiConfigFile(): Partial<AiConfig> {
   }
 }
 
+function readStripeConfigFile(): Partial<StripeFileConfig> {
+  try {
+    if (!existsSync(STRIPE_CONFIG_PATH)) return {}
+    return JSON.parse(readFileSync(STRIPE_CONFIG_PATH, 'utf-8')) as Partial<StripeFileConfig>
+  } catch {
+    return {}
+  }
+}
+
+// ── Static config (env vars) ───────────────────────────────
+
 export const config = {
   port: Number(process.env.PORT ?? 4000),
   appUrl: process.env.APP_URL ?? 'http://localhost:5173',
   adminUrl: process.env.ADMIN_URL ?? 'http://localhost:5174',
-  stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? '',
-  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? '',
-  stripePrices: {
-    nivel1: process.env.STRIPE_PRICE_ID_NIVEL1 ?? '',
-    nivel2: process.env.STRIPE_PRICE_ID_NIVEL2 ?? '',
-    nivel3: process.env.STRIPE_PRICE_ID_NIVEL3 ?? '',
-  },
   supabaseUrl: process.env.SUPABASE_URL ?? '',
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? '',
   adminApiSecret: process.env.ADMIN_API_SECRET ?? 'vs-admin-dev',
 }
 
+// ── Dynamic Stripe config ──────────────────────────────────
+// Priority: env vars → .stripe-config.json → empty string
+// Read at call time so admin-panel updates take effect without restart.
+
+export function getStripeConfig(): StripeFileConfig {
+  const file = readStripeConfigFile()
+  return {
+    secretKey:       process.env.STRIPE_SECRET_KEY        ?? file.secretKey        ?? '',
+    webhookSecret:   process.env.STRIPE_WEBHOOK_SECRET    ?? file.webhookSecret    ?? '',
+    priceIdNivel1:   process.env.STRIPE_PRICE_ID_NIVEL1   ?? file.priceIdNivel1    ?? '',
+    priceIdNivel2:   process.env.STRIPE_PRICE_ID_NIVEL2   ?? file.priceIdNivel2    ?? '',
+    priceIdNivel3:   process.env.STRIPE_PRICE_ID_NIVEL3   ?? file.priceIdNivel3    ?? '',
+  }
+}
+
 export function hasStripeConfig(): boolean {
-  return Boolean(config.stripeSecretKey)
+  return Boolean(getStripeConfig().secretKey)
 }
 
 export function hasSupabaseAdminConfig(): boolean {
@@ -41,7 +72,7 @@ export function hasSupabaseAdminConfig(): boolean {
 
 /**
  * Resolves the current AI config.
- * Priority: env vars → .ai-config.json file → no config.
+ * Priority: env vars → .ai-config.json → no config.
  */
 export function getAiConfig(): AiConfig | null {
   const fileConfig = readAiConfigFile()

@@ -2,23 +2,54 @@ import { useState } from 'react'
 import { StripeSettings } from './StripeSettings'
 import { loadSettings, saveSettings, type AppSettings } from './settingsTypes'
 
+const ADMIN_TOKEN = import.meta.env.VITE_ADMIN_TOKEN ?? 'vs-admin-dev'
+
+type SyncState = 'idle' | 'syncing' | 'synced' | 'error'
+
+async function syncStripeSettingsToBackend(settings: AppSettings): Promise<void> {
+  const { stripe } = settings
+  await fetch('/api/admin/stripe-settings', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-admin-token': ADMIN_TOKEN,
+    },
+    body: JSON.stringify({
+      secretKey:     stripe.secretKey,
+      webhookSecret: stripe.webhookSecret,
+      priceIdNivel1: stripe.priceIdNivel1,
+      priceIdNivel2: stripe.priceIdNivel2,
+      priceIdNivel3: stripe.priceIdNivel3,
+    }),
+  })
+}
+
 export function StripeSettingsPage() {
   const [settings, setSettings] = useState<AppSettings>(loadSettings)
-  const [saved, setSaved] = useState(false)
+  const [syncState, setSyncState] = useState<SyncState>('idle')
 
-  function handleSave() {
+  async function handleSave() {
     saveSettings(settings)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2500)
+
+    if (!settings.stripe.secretKey) return
+
+    setSyncState('syncing')
+    try {
+      await syncStripeSettingsToBackend(settings)
+      setSyncState('synced')
+      setTimeout(() => setSyncState('idle'), 3000)
+    } catch {
+      setSyncState('error')
+      setTimeout(() => setSyncState('idle'), 4000)
+    }
   }
 
   function handleReset() {
     if (!confirm('Tem certeza? Isso apagará todas as configurações do Stripe.')) return
-    const fresh = loadSettings()
     const resetted: AppSettings = {
       ...settings,
       stripe: {
-        secretKey: '',
+        secretKey:     '',
         webhookSecret: '',
         priceIdNivel1: '',
         priceIdNivel2: '',
@@ -26,7 +57,7 @@ export function StripeSettingsPage() {
       },
     }
     saveSettings(resetted)
-    setSettings(fresh)
+    setSettings(resetted)
   }
 
   return (
@@ -51,22 +82,32 @@ export function StripeSettingsPage() {
       </div>
 
       <div className="settings-footer">
+        {syncState === 'syncing' && (
+          <span className="sync-status syncing">
+            <span className="sync-spinner" />
+            Sincronizando com o servidor...
+          </span>
+        )}
+        {syncState === 'synced' && (
+          <span className="sync-status synced">
+            <i className="bi bi-check-circle-fill" />
+            Sincronizado com o servidor
+          </span>
+        )}
+        {syncState === 'error' && (
+          <span className="sync-status sync-error">
+            <i className="bi bi-exclamation-circle-fill" />
+            Falha ao sincronizar — API rodando?
+          </span>
+        )}
+
         <button type="button" className="btn-settings-reset" onClick={handleReset}>
           <i className="bi bi-trash3" />
           Limpar chaves
         </button>
         <button type="button" className="btn-settings-save" onClick={handleSave}>
-          {saved ? (
-            <>
-              <i className="bi bi-check-lg" />
-              Salvo!
-            </>
-          ) : (
-            <>
-              <i className="bi bi-floppy2-fill" />
-              Salvar configurações
-            </>
-          )}
+          <i className="bi bi-floppy2-fill" />
+          Salvar configurações
         </button>
       </div>
     </div>

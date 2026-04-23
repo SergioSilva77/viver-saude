@@ -87,6 +87,7 @@ export function LoginScreen({ onLogin }: Props) {
         userId: result.userId!,
         email: result.email!,
         planIds: resolvedPlanIds,
+        planExpiresAt: result.planExpiresAt,
         guardiao24hUnlockedUntil: buildGuardiao24hTimestamp(resolvedPlanIds),
       })
       onLogin(resolvedPlanIds)

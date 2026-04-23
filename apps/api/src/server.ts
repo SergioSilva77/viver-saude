@@ -14,7 +14,7 @@ import {
   applyWebhookCheckoutCompleted,
   getStripeClient,
 } from './services.js'
-import { config, hasStripeConfig, getAiConfig } from './config.js'
+import { config, getStripeConfig, hasStripeConfig, getAiConfig, type StripeFileConfig } from './config.js'
 import { chat, type ChatMessage, type UserProfile } from './ai.js'
 import { recordUsage, getUsageStats, setQuota } from './tokenTracker.js'
 import { listUsers, upsertUser, removeUser, findByEmail } from './userStore.js'
@@ -28,6 +28,7 @@ import {
 
 // ── Paths ──────────────────────────────────────────────────
 const AI_CONFIG_PATH = resolve(process.cwd(), '.ai-config.json')
+const STRIPE_CONFIG_PATH = resolve(process.cwd(), '.stripe-config.json')
 const KNOWLEDGE_DIR = resolve(process.cwd(), 'knowledge')
 
 // Ensure required directories exist on startup
@@ -86,6 +87,14 @@ const aiSettingsSchema = z.object({
   provider: z.enum(['claude', 'gemini']),
   apiKey: z.string().min(10),
   model: z.string().min(3),
+})
+
+const stripeSettingsSchema = z.object({
+  secretKey:      z.string().min(1),
+  webhookSecret:  z.string().default(''),
+  priceIdNivel1:  z.string().default(''),
+  priceIdNivel2:  z.string().default(''),
+  priceIdNivel3:  z.string().default(''),
 })
 
 const loginSchema = z.object({
@@ -147,7 +156,8 @@ const app = express()
 
 // Webhook route must be before express.json()
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async (request, response) => {
-  if (!hasStripeConfig() || !config.stripeWebhookSecret) {
+  const stripeConf = getStripeConfig()
+  if (!stripeConf.secretKey || !stripeConf.webhookSecret) {
     response.status(503).json({
       message: 'Configure STRIPE_SECRET_KEY e STRIPE_WEBHOOK_SECRET para processar webhooks.',
     })
@@ -158,7 +168,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
     const event = getStripeClient().webhooks.constructEvent(
       request.body,
       request.headers['stripe-signature'] ?? '',
-      config.stripeWebhookSecret,
+      stripeConf.webhookSecret,
     )
 
     if (event.type === 'checkout.session.completed') {
@@ -242,6 +252,17 @@ app.post('/api/admin/ai-settings', requireAdminToken, (req, res) => {
     res.json({ ok: true, message: 'Configurações de IA salvas no servidor.' })
   } catch (error) {
     res.status(400).json({ message: error instanceof Error ? error.message : 'Falha ao salvar configurações de IA.' })
+  }
+})
+
+// ── Stripe: save settings ─────────────────────────────────
+app.post('/api/admin/stripe-settings', requireAdminToken, (req, res) => {
+  try {
+    const payload = stripeSettingsSchema.parse(req.body) satisfies StripeFileConfig
+    writeFileSync(STRIPE_CONFIG_PATH, JSON.stringify(payload, null, 2), 'utf-8')
+    res.json({ ok: true, message: 'Configurações do Stripe salvas no servidor.' })
+  } catch (error) {
+    res.status(400).json({ message: error instanceof Error ? error.message : 'Falha ao salvar configurações do Stripe.' })
   }
 })
 
@@ -413,7 +434,13 @@ app.post('/api/auth/login', (req, res) => {
       return
     }
 
-    res.json({ ok: true, userId: user.id, email: user.email, planIds: user.planIds })
+    res.json({
+      ok: true,
+      userId: user.id,
+      email: user.email,
+      planIds: user.planIds,
+      planExpiresAt: user.planExpiresAt ?? {},
+    })
   } catch (error) {
     res.status(400).json({ message: error instanceof Error ? error.message : 'Credenciais inválidas.' })
   }

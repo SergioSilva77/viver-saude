@@ -237,14 +237,39 @@ function App() {
   const [healthProfile, setHealthProfile] = useState<HealthProfile>(loadHealthProfile)
   const [showHealthEditor, setShowHealthEditor] = useState(false)
 
+  // Checkout
+  const [checkoutLoading, setCheckoutLoading] = useState<PlanId | null>(null)
+  const [checkoutError, setCheckoutError] = useState<string | null>(null)
+
+  // Payment success detection (set via ?checkout=success in URL)
+  const [showPaymentSuccess, setShowPaymentSuccess] = useState(() => {
+    const params = new URLSearchParams(window.location.search)
+    return params.get('checkout') === 'success'
+  })
+
   // Confirm dialog ref (for consultant)
   const consultorConfirmedRef = useRef(false)
 
   useEffect(() => {
+    // Clear checkout URL params after reading them
+    if (window.location.search.includes('checkout=')) {
+      const url = new URL(window.location.href)
+      url.searchParams.delete('checkout')
+      url.searchParams.delete('plan')
+      window.history.replaceState({}, '', url.toString())
+    }
+
     if (!isSupabaseConfigured()) {
       const session = loadSession()
       if (session) {
-        setActivePlans(session.planIds)
+        // Filter out expired plans
+        const now = Date.now()
+        const validPlans = session.planIds.filter((pid) => {
+          const expiry = session.planExpiresAt?.[pid]
+          return !expiry || expiry > now
+        }) as PlanId[]
+
+        setActivePlans(validPlans)
         setGuardiao24hUntil(session.guardiao24hUnlockedUntil ?? null)
         setConsultantUsed(session.consultantUsed ?? false)
         setSessionUserId(session.userId)
@@ -299,6 +324,28 @@ function App() {
     return () => clearInterval(id)
   }, [guardiao24hUntil])
 
+  async function handleSubscribe(planId: PlanId) {
+    setCheckoutError(null)
+    setCheckoutLoading(planId)
+    try {
+      const res = await fetch('/api/billing/checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: sessionUserEmail ?? '', planId }),
+      })
+      const data = await res.json() as { url?: string; message?: string }
+      if (!res.ok || !data.url) {
+        setCheckoutError(data.message ?? 'Não foi possível iniciar o checkout.')
+        return
+      }
+      window.location.href = data.url
+    } catch {
+      setCheckoutError('Não foi possível conectar ao servidor. Tente novamente.')
+    } finally {
+      setCheckoutLoading(null)
+    }
+  }
+
   function handleConsultorUse() {
     consultorConfirmedRef.current = true
     setConsultantUsed(true)
@@ -325,6 +372,30 @@ function App() {
           setAuthState('authenticated')
         }}
       />
+    )
+  }
+
+  // Payment success screen
+  if (showPaymentSuccess) {
+    return (
+      <div className="payment-success-screen">
+        <div className="payment-success-card">
+          <div className="payment-success-icon">
+            <i className="bi bi-check-circle-fill" />
+          </div>
+          <h1 className="payment-success-title">Pagamento confirmado!</h1>
+          <p className="payment-success-sub">
+            Sua assinatura foi ativada com sucesso. Faça login para acessar todos os recursos do seu plano.
+          </p>
+          <button
+            type="button"
+            className="btn-subscribe primary"
+            onClick={() => setShowPaymentSuccess(false)}
+          >
+            Acessar minha conta
+          </button>
+        </div>
+      </div>
     )
   }
 
@@ -381,6 +452,12 @@ function App() {
               <h2 className="section-title">Escolha seu plano</h2>
               <p className="section-sub">Comece sua jornada de saúde hoje</p>
             </div>
+            {checkoutError && (
+              <div className="checkout-error-banner">
+                <i className="bi bi-exclamation-triangle-fill" />
+                {checkoutError}
+              </div>
+            )}
             <div className="plans-list">
               {plans.map((plan, index) => (
                 <div key={plan.id} className={`plan-card ${index === 1 ? 'featured' : ''}`}>
@@ -413,8 +490,14 @@ function App() {
                   <button
                     type="button"
                     className={`btn-subscribe ${index === 1 ? 'primary' : 'outline'}`}
+                    disabled={checkoutLoading !== null}
+                    onClick={() => handleSubscribe(plan.id)}
                   >
-                    Assinar {index === 0 ? 'agora' : 'plano'}
+                    {checkoutLoading === plan.id ? (
+                      <><span className="btn-spinner" /> Aguarde...</>
+                    ) : (
+                      <>Assinar {index === 0 ? 'agora' : 'plano'}</>
+                    )}
                   </button>
                 </div>
               ))}

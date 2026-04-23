@@ -10,6 +10,11 @@ export interface StoredUser {
   planIds: string[]
   /** Plain text password — matches dev-mode behaviour. */
   password: string
+  /**
+   * Per-plan expiry as ISO date strings.
+   * Absent or null means lifetime access (one-time payment).
+   */
+  planExpiresAt?: Record<string, string>
 }
 
 // ── Storage ────────────────────────────────────────────────
