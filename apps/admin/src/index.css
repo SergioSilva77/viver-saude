@@ -21,6 +21,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  background: #0b1a10;
 }
 
 button,
@@ -31,4 +32,11 @@ textarea {
 #root {
   width: min(1400px, 100%);
   margin: 0 auto;
+}
+
+/* Login screen must escape the max-width container and fill the full viewport */
+#root:has(.admin-login-screen) {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
 }
