@@ -146,16 +146,20 @@ export async function applyWebhookCheckoutCompleted(session: Stripe.Checkout.Ses
       ? localUser.planIds
       : [...localUser.planIds, planId]
 
-    const updatedPlanExpiresAt = {
-      ...(localUser.planExpiresAt ?? {}),
-      ...(expiresAt ? { [planId]: expiresAt } : {}),
-    }
+    // Save Stripe subscription ID for monthly plans (needed for future cancellation)
+    const subscriptionId = typeof session.subscription === 'string' ? session.subscription : null
+
+    // Clear any previous cancellation record for this plan (re-subscription)
+    const updatedCancelledAt = { ...(localUser.planCancelledAt ?? {}) }
+    delete updatedCancelledAt[planId]
 
     upsertUser({
       id: localUser.id,
       email: localUser.email,
       planIds: updatedPlanIds,
-      planExpiresAt: updatedPlanExpiresAt,
+      planExpiresAt: expiresAt ? { [planId]: expiresAt } : undefined,
+      subscriptionIds: subscriptionId ? { [planId]: subscriptionId } : undefined,
+      planCancelledAt: updatedCancelledAt,
     })
   }
 
@@ -203,6 +207,87 @@ export async function applyWebhookCheckoutCompleted(session: Stripe.Checkout.Ses
     persisted: true,
     message: 'Pagamento confirmado e acesso liberado.',
   }
+}
+
+/**
+ * Called when Stripe fires `customer.subscription.deleted`.
+ * Removes the cancelled plan from the user's active plan list.
+ */
+export async function applyWebhookSubscriptionDeleted(subscription: Stripe.Subscription) {
+  const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer?.id
+
+  if (!customerId) return { skipped: true, reason: 'No customer ID in subscription event.' }
+
+  // Find user by matching subscriptionId in any stored record
+  const { listUsers, upsertUser: updateUser } = await import('./userStore.js')
+  const users = listUsers()
+  const user = users.find((u) =>
+    Object.values(u.subscriptionIds ?? {}).includes(subscription.id)
+  )
+
+  if (!user) return { skipped: true, reason: 'No user found with this subscription ID.' }
+
+  // Identify which planId corresponds to this subscription
+  const planId = Object.entries(user.subscriptionIds ?? {}).find(
+    ([, subId]) => subId === subscription.id
+  )?.[0]
+
+  if (!planId) return { skipped: true, reason: 'Could not map subscription to a plan.' }
+
+  // Remove the plan from active plans and clear tracking fields
+  const updatedPlanIds = user.planIds.filter((id) => id !== planId)
+  const updatedSubscriptionIds = { ...(user.subscriptionIds ?? {}) }
+  delete updatedSubscriptionIds[planId]
+  const updatedCancelledAt = { ...(user.planCancelledAt ?? {}) }
+  delete updatedCancelledAt[planId]
+  const updatedPlanExpiresAt = { ...(user.planExpiresAt ?? {}) }
+  delete updatedPlanExpiresAt[planId]
+
+  updateUser({
+    id: user.id,
+    email: user.email,
+    planIds: updatedPlanIds,
+    subscriptionIds: updatedSubscriptionIds,
+    planCancelledAt: updatedCancelledAt,
+    planExpiresAt: updatedPlanExpiresAt,
+  })
+
+  return { ok: true, userId: user.id, planId, message: `Plano ${planId} removido após cancelamento no Stripe.` }
+}
+
+/**
+ * Cancels a Stripe subscription at period end.
+ * Returns the period end date so the frontend can display it.
+ */
+export async function cancelSubscriptionAtPeriodEnd(userId: string, planId: string): Promise<{ cancelAt: string }> {
+  const { findByEmail, listUsers, upsertUser: updateUser } = await import('./userStore.js')
+  const users = listUsers()
+  const user = users.find((u) => u.id === userId)
+
+  if (!user) throw new Error('Usuário não encontrado.')
+
+  const subscriptionId = user.subscriptionIds?.[planId]
+  if (!subscriptionId) throw new Error('Nenhuma assinatura recorrente encontrada para este plano.')
+
+  const stripe = getStripeClient()
+  await stripe.subscriptions.update(subscriptionId, { cancel_at_period_end: true })
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+
+  // current_period_end moved to items in Stripe API 2025-03-31
+  const periodEnd = (subscription as unknown as { current_period_end?: number }).current_period_end
+    ?? subscription.items?.data?.[0]?.current_period_end
+    ?? Math.floor(Date.now() / 1000) + 30 * 86400
+
+  const cancelAt = new Date(periodEnd * 1000).toISOString()
+
+  // Record the cancellation date locally so the UI can show it immediately
+  updateUser({
+    id: user.id,
+    email: user.email,
+    planCancelledAt: { [planId]: cancelAt },
+  })
+
+  return { cancelAt }
 }
 
 export function getCatalog() {

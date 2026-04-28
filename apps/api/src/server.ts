@@ -12,6 +12,8 @@ import {
   createCheckoutSession,
   registerPendingUser,
   applyWebhookCheckoutCompleted,
+  applyWebhookSubscriptionDeleted,
+  cancelSubscriptionAtPeriodEnd,
   getStripeClient,
 } from './services.js'
 import { getPlan } from '@viver-saude/shared'
@@ -187,6 +189,10 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
       await applyWebhookCheckoutCompleted(event.data.object as Stripe.Checkout.Session)
     }
 
+    if (event.type === 'customer.subscription.deleted') {
+      await applyWebhookSubscriptionDeleted(event.data.object as Stripe.Subscription)
+    }
+
     response.json({ received: true })
   } catch (error) {
     response.status(400).json({
@@ -351,6 +357,27 @@ app.post('/api/auth/register', async (req, res) => {
     })
   } catch (error) {
     res.status(400).json({ message: error instanceof Error ? error.message : 'Falha ao criar conta.' })
+  }
+})
+
+app.post('/api/billing/cancel-subscription', async (req, res) => {
+  if (!hasStripeConfig()) {
+    res.status(503).json({ ok: false, message: 'O Stripe ainda não está configurado.' })
+    return
+  }
+
+  const { userId, planId } = req.body as { userId?: string; planId?: string }
+
+  if (!userId || !planId) {
+    res.status(400).json({ ok: false, message: 'userId e planId são obrigatórios.' })
+    return
+  }
+
+  try {
+    const result = await cancelSubscriptionAtPeriodEnd(userId, planId)
+    res.json({ ok: true, cancelAt: result.cancelAt })
+  } catch (error) {
+    res.status(400).json({ ok: false, message: error instanceof Error ? error.message : 'Falha ao cancelar assinatura.' })
   }
 })
 

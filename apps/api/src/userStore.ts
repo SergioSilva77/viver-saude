@@ -15,6 +15,17 @@ export interface StoredUser {
    * Absent or null means lifetime access (one-time payment).
    */
   planExpiresAt?: Record<string, string>
+  /**
+   * Stripe Subscription IDs mapped by planId.
+   * Used to cancel subscriptions via the Stripe API.
+   * Only populated for recurring (monthly) plans.
+   */
+  subscriptionIds?: Record<string, string>
+  /**
+   * Plans scheduled for cancellation at period end.
+   * Value is the ISO date when access will be revoked.
+   */
+  planCancelledAt?: Record<string, string>
 }
 
 // ── Storage ────────────────────────────────────────────────
@@ -56,10 +67,13 @@ export function upsertUser(data: Partial<StoredUser> & { id: string; email: stri
     ...existing,
     id: data.id,
     email: data.email,
-    // Allow explicit override of fullName/planIds/password
+    // Allow explicit override of tracked fields
     ...(data.fullName !== undefined ? { fullName: data.fullName } : {}),
     ...(data.planIds !== undefined ? { planIds: data.planIds } : {}),
     ...(data.password !== undefined ? { password: data.password } : {}),
+    ...(data.planExpiresAt !== undefined ? { planExpiresAt: { ...(existing?.planExpiresAt ?? {}), ...data.planExpiresAt } } : {}),
+    ...(data.subscriptionIds !== undefined ? { subscriptionIds: { ...(existing?.subscriptionIds ?? {}), ...data.subscriptionIds } } : {}),
+    ...(data.planCancelledAt !== undefined ? { planCancelledAt: { ...(existing?.planCancelledAt ?? {}), ...data.planCancelledAt } } : {}),
   }
 
   if (idx !== -1) {

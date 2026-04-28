@@ -705,6 +705,116 @@
   font-weight: 700;
 }
 
+.plan-active-footer-cancelled {
+  background: rgba(230, 80, 60, 0.08);
+  color: #b03020;
+}
+
+.plan-active-footer-cancelled strong {
+  color: #8a1a10;
+}
+
+/* ════════════════════════════════════════════════════════════
+   CANCEL SUBSCRIPTION MODAL
+════════════════════════════════════════════════════════════ */
+
+.cancel-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 9000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 1rem;
+  animation: fadeIn 0.2s ease;
+}
+
+.cancel-modal {
+  background: white;
+  border-radius: 20px 20px 16px 16px;
+  padding: 2rem 1.5rem 1.75rem;
+  width: 100%;
+  max-width: 420px;
+  text-align: center;
+  box-shadow: 0 -4px 32px rgba(0, 0, 0, 0.15);
+  animation: slideUp 0.25s ease;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(40px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.cancel-modal-icon {
+  font-size: 2.75rem;
+  color: #e05040;
+  margin-bottom: 0.75rem;
+  line-height: 1;
+}
+
+.cancel-modal-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #1a3328;
+  margin-bottom: 0.6rem;
+}
+
+.cancel-modal-body {
+  font-size: 0.875rem;
+  color: #5a7a6a;
+  line-height: 1.55;
+  margin-bottom: 1.5rem;
+}
+
+.cancel-modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.btn-cancel-modal-dismiss {
+  background: #f0f4f2;
+  color: #2e7d5e;
+  border: none;
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-cancel-modal-dismiss:hover {
+  background: #e0ede8;
+}
+
+.btn-cancel-modal-confirm {
+  background: #e05040;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.btn-cancel-modal-confirm:hover:not(:disabled) {
+  background: #c0302a;
+}
+
+.btn-cancel-modal-confirm:disabled,
+.btn-cancel-modal-dismiss:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .login-dev-banner {
   position: fixed;
   top: 0;

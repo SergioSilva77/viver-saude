@@ -258,6 +258,11 @@ function App() {
   const [healthProfile, setHealthProfile] = useState<HealthProfile>(loadHealthProfile)
   const [showHealthEditor, setShowHealthEditor] = useState(false)
 
+  // Cancel subscription modal
+  const [cancelModal, setCancelModal] = useState<{ planId: PlanId; planLabel: string } | null>(null)
+  const [cancelLoading, setCancelLoading] = useState(false)
+  const [cancelResult, setCancelResult] = useState<Record<string, string>>({}) // planId → ISO cancelAt date
+
   // Checkout
   const [checkoutLoading, setCheckoutLoading] = useState<PlanId | null>(null)
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
@@ -401,6 +406,26 @@ function App() {
     consultorConfirmedRef.current = true
     setConsultantUsed(true)
     updateSession({ consultantUsed: true })
+  }
+
+  async function handleCancelSubscription(planId: PlanId) {
+    if (!sessionUserId) return
+    setCancelLoading(true)
+    try {
+      const res = await fetch('/api/billing/cancel-subscription', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: sessionUserId, planId }),
+      })
+      const data = await res.json() as { ok?: boolean; cancelAt?: string; message?: string }
+      if (!res.ok || !data.ok) throw new Error(data.message ?? 'Falha ao cancelar.')
+      setCancelResult((prev) => ({ ...prev, [planId]: data.cancelAt! }))
+      setCancelModal(null)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Erro ao cancelar assinatura.')
+    } finally {
+      setCancelLoading(false)
+    }
   }
 
   if (authState === 'checking') {
@@ -588,10 +613,18 @@ function App() {
                         ))}
                       </ul>
                       {isActive ? (
-                        <div className="plan-active-footer">
-                          {expiryIso
-                            ? <>Renovação: <strong>{new Date(typeof expiryIso === 'number' ? expiryIso : Date.parse(String(expiryIso))).toLocaleDateString('pt-BR')}</strong></>
-                            : 'Acesso vitalício'}
+                        <div className={`plan-active-footer ${cancelResult[plan.id] ? 'plan-active-footer-cancelled' : ''}`}>
+                          {cancelResult[plan.id] ? (
+                            <>
+                              <i className="bi bi-clock-history" />
+                              Cancelamento agendado — ativo até{' '}
+                              <strong>{new Date(cancelResult[plan.id]).toLocaleDateString('pt-BR')}</strong>
+                            </>
+                          ) : expiryIso ? (
+                            <>Renovação: <strong>{new Date(typeof expiryIso === 'number' ? expiryIso : Date.parse(String(expiryIso))).toLocaleDateString('pt-BR')}</strong></>
+                          ) : (
+                            'Acesso vitalício'
+                          )}
                         </div>
                       ) : (
                         <button
@@ -753,7 +786,14 @@ function App() {
                   { icon: 'bi-heart', label: 'Saúde e histórico familiar', action: () => setShowHealthEditor(true) },
                   { icon: 'bi-credit-card', label: 'Histórico de pagamentos', action: undefined as (() => void) | undefined },
                   { icon: 'bi-arrow-up-circle', label: 'Fazer upgrade de plano', action: goToPlans },
-                  { icon: 'bi-x-circle', label: 'Cancelar assinatura', action: undefined },
+                  { icon: 'bi-x-circle', label: 'Cancelar assinatura', action: (() => {
+                    const monthlyPlan = activePlans.find((pid) => plans.find((p) => p.id === pid)?.billingInterval === 'monthly')
+                    if (!monthlyPlan) return undefined
+                    return () => {
+                      const label = plans.find((p) => p.id === monthlyPlan)?.label ?? monthlyPlan
+                      setCancelModal({ planId: monthlyPlan as PlanId, planLabel: label })
+                    }
+                  })() },
                   { icon: 'bi-box-arrow-right', label: 'Sair', action: handleLogout },
                 ].map((item) => (
                   <li key={item.label}>
@@ -871,6 +911,41 @@ function App() {
           }}
           onClose={() => setShowHealthEditor(false)}
         />
+      )}
+
+      {/* ── Modal de cancelamento de assinatura ───────────── */}
+      {cancelModal && (
+        <div className="cancel-modal-backdrop" onClick={() => setCancelModal(null)}>
+          <div className="cancel-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="cancel-modal-icon">
+              <i className="bi bi-x-circle-fill" />
+            </div>
+            <h3 className="cancel-modal-title">Cancelar assinatura</h3>
+            <p className="cancel-modal-body">
+              Tem certeza que deseja cancelar o plano <strong>{cancelModal.planLabel}</strong>?
+              <br />
+              Você continuará tendo acesso até o fim do período pago.
+            </p>
+            <div className="cancel-modal-actions">
+              <button
+                type="button"
+                className="btn-cancel-modal-dismiss"
+                onClick={() => setCancelModal(null)}
+                disabled={cancelLoading}
+              >
+                Manter assinatura
+              </button>
+              <button
+                type="button"
+                className="btn-cancel-modal-confirm"
+                disabled={cancelLoading}
+                onClick={() => handleCancelSubscription(cancelModal.planId)}
+              >
+                {cancelLoading ? <span className="btn-spinner" /> : 'Confirmar cancelamento'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Navegação inferior ────────────────────────────── */}
