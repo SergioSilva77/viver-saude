@@ -10,6 +10,7 @@ import {
   type PlanId,
 } from '@viver-saude/shared'
 import { LoginScreen } from './auth/LoginScreen'
+import { RegisterScreen } from './auth/RegisterScreen'
 import { MeuGuardiao } from './guardiao/MeuGuardiao'
 import { HealthProfileEditor } from './health/HealthProfileEditor'
 import { loadHealthProfile, saveHealthProfile, type HealthProfile } from './health/healthProfile'
@@ -19,6 +20,26 @@ import './App.css'
 
 const planIcons = ['bi-seedling', 'bi-heart-pulse', 'bi-stars']
 const planIconClass = ['n1', 'n2', 'n3']
+
+/**
+ * Plan hierarchy: a higher tier covers lower tiers.
+ * If the user has nivel3, they implicitly have nivel2 and nivel1.
+ */
+const PLAN_HIERARCHY: Record<PlanId, PlanId[]> = {
+  nivel1: ['nivel1'],
+  nivel2: ['nivel1', 'nivel2'],
+  nivel3: ['nivel1', 'nivel2', 'nivel3'],
+}
+
+function expandPlanHierarchy(activePlans: PlanId[]): Set<PlanId> {
+  const expanded = new Set<PlanId>()
+  for (const planId of activePlans) {
+    for (const covered of PLAN_HIERARCHY[planId] ?? [planId]) {
+      expanded.add(covered)
+    }
+  }
+  return expanded
+}
 
 /* ─────────────────────────────────────────────────────────────
    Countdown helpers
@@ -241,22 +262,45 @@ function App() {
   const [checkoutLoading, setCheckoutLoading] = useState<PlanId | null>(null)
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
 
-  // Payment success detection (set via ?checkout=success in URL)
-  const [showPaymentSuccess, setShowPaymentSuccess] = useState(() => {
+  // Post-payment registration detection (set via ?checkout=success&session_id=xxx in URL)
+  const [checkoutSession, setCheckoutSession] = useState<{ sessionId: string; planId: string } | null>(() => {
     const params = new URLSearchParams(window.location.search)
-    return params.get('checkout') === 'success'
+    if (params.get('checkout') !== 'success') return null
+    const sessionId = params.get('session_id') ?? ''
+    const planId = params.get('plan') ?? 'nivel1'
+    return sessionId ? { sessionId, planId } : null
   })
+
+  // Shown on LoginScreen after registration completes
+  const [registrationSuccessEmail, setRegistrationSuccessEmail] = useState<string | null>(null)
+
+  // Pre-flight: is Stripe configured on the backend? null = checking
+  const [stripeReady, setStripeReady] = useState<boolean | null>(null)
 
   // Confirm dialog ref (for consultant)
   const consultorConfirmedRef = useRef(false)
 
+  // Pre-flight check Stripe availability once on mount.
+  // This is a defense layer — disables Assinar buttons if the backend reports Stripe is not configured.
   useEffect(() => {
-    // Clear checkout URL params after reading them
+    let cancelled = false
+    fetch('/api/health')
+      .then((r) => r.json())
+      .then((data: { stripeConfigured?: boolean }) => {
+        if (!cancelled) setStripeReady(Boolean(data.stripeConfigured))
+      })
+      .catch(() => {
+        if (!cancelled) setStripeReady(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    // Clear checkout URL params after reading them (keep state in React)
     if (window.location.search.includes('checkout=')) {
-      const url = new URL(window.location.href)
-      url.searchParams.delete('checkout')
-      url.searchParams.delete('plan')
-      window.history.replaceState({}, '', url.toString())
+      window.history.replaceState({}, '', window.location.pathname)
     }
 
     if (!isSupabaseConfigured()) {
@@ -326,14 +370,21 @@ function App() {
 
   async function handleSubscribe(planId: PlanId) {
     setCheckoutError(null)
+
+    // Layer 4: client-side guard — refuse if Stripe is known not configured.
+    if (stripeReady === false) {
+      setCheckoutError('Pagamentos indisponíveis no momento. Tente novamente mais tarde.')
+      return
+    }
+
     setCheckoutLoading(planId)
     try {
       const res = await fetch('/api/billing/checkout-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: sessionUserEmail ?? '', planId }),
+        body: JSON.stringify({ planId, ...(sessionUserEmail ? { email: sessionUserEmail } : {}) }),
       })
-      const data = await res.json() as { url?: string; message?: string }
+      const data = await res.json() as { ok?: boolean; url?: string; message?: string; code?: string }
       if (!res.ok || !data.url) {
         setCheckoutError(data.message ?? 'Não foi possível iniciar o checkout.')
         return
@@ -365,37 +416,57 @@ function App() {
     return (
       <LoginScreen
         onLogin={(planIds) => {
+          setRegistrationSuccessEmail(null)
           setActivePlans(planIds)
           const session = loadSession()
           setGuardiao24hUntil(session?.guardiao24hUnlockedUntil ?? null)
           setConsultantUsed(session?.consultantUsed ?? false)
           setAuthState('authenticated')
         }}
+        onSubscribe={async (planId) => {
+          // Layer 4: client-side guard — refuse to call API if Stripe isn't known to be ready.
+          // This makes bypass impossible even if backend has a bug.
+          if (stripeReady === false) {
+            throw new Error('Pagamentos indisponíveis no momento. Tente novamente mais tarde.')
+          }
+          const res = await fetch('/api/billing/checkout-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ planId }),
+          })
+          const data = await res.json() as { ok?: boolean; url?: string; message?: string; code?: string }
+          if (!res.ok || !data.url) {
+            // Surface the real backend message (instead of a generic one)
+            throw new Error(data.message ?? 'Erro ao iniciar checkout.')
+          }
+          // Integrity assertion: must have a Stripe URL to navigate to. No silent grant.
+          window.location.href = data.url
+        }}
+        successMessage={
+          registrationSuccessEmail
+            ? 'Cadastro realizado! Faça login para acessar seu plano.'
+            : undefined
+        }
+        prefilledEmail={registrationSuccessEmail ?? undefined}
+        stripeReady={stripeReady}
       />
     )
   }
 
-  // Payment success screen
-  if (showPaymentSuccess) {
+  // Post-payment registration screen
+  if (checkoutSession) {
     return (
-      <div className="payment-success-screen">
-        <div className="payment-success-card">
-          <div className="payment-success-icon">
-            <i className="bi bi-check-circle-fill" />
-          </div>
-          <h1 className="payment-success-title">Pagamento confirmado!</h1>
-          <p className="payment-success-sub">
-            Sua assinatura foi ativada com sucesso. Faça login para acessar todos os recursos do seu plano.
-          </p>
-          <button
-            type="button"
-            className="btn-subscribe primary"
-            onClick={() => setShowPaymentSuccess(false)}
-          >
-            Acessar minha conta
-          </button>
-        </div>
-      </div>
+      <RegisterScreen
+        sessionId={checkoutSession.sessionId}
+        planId={checkoutSession.planId}
+        onRegistered={(email) => {
+          // Registration done — clear checkout state and go to login.
+          // The user must sign in with the credentials they just created.
+          setCheckoutSession(null)
+          setRegistrationSuccessEmail(email)
+        }}
+        onBack={() => setCheckoutSession(null)}
+      />
     )
   }
 
@@ -446,64 +517,103 @@ function App() {
       <div className="scroll-area">
 
         {/* INÍCIO */}
-        {activeSection === 'inicio' && (
-          <>
-            <div>
-              <h2 className="section-title">Escolha seu plano</h2>
-              <p className="section-sub">Comece sua jornada de saúde hoje</p>
-            </div>
-            {checkoutError && (
-              <div className="checkout-error-banner">
-                <i className="bi bi-exclamation-triangle-fill" />
-                {checkoutError}
+        {activeSection === 'inicio' && (() => {
+          const effectivePlans = expandPlanHierarchy(activePlans)
+          const allPlansCovered = plans.every((p) => effectivePlans.has(p.id))
+          return (
+            <>
+              <div>
+                <h2 className="section-title">
+                  {allPlansCovered ? 'Sua jornada começa aqui' : 'Escolha seu plano'}
+                </h2>
+                <p className="section-sub">
+                  {allPlansCovered
+                    ? 'Você já tem acesso a todos os recursos disponíveis.'
+                    : 'Comece sua jornada de saúde hoje'}
+                </p>
               </div>
-            )}
-            <div className="plans-list">
-              {plans.map((plan, index) => (
-                <div key={plan.id} className={`plan-card ${index === 1 ? 'featured' : ''}`}>
-                  {index === 1 && <span className="plan-featured-badge">mais popular</span>}
-                  <div className="plan-card-top">
-                    <div className={`plan-icon ${planIconClass[index]}`}>
-                      <i className={`bi ${planIcons[index]}`}></i>
-                    </div>
-                    <div className="plan-meta">
-                      <div className="plan-name">{plan.label}</div>
-                      <div className="plan-price">
-                        <span className="plan-price-currency">R$</span>
-                        <span className="plan-price-value">
-                          {(plan.priceInCents / 100).toFixed(2).replace('.', ',')}
-                        </span>
-                        {plan.billingInterval === 'monthly' && (
-                          <span className="plan-price-period">/mês</span>
-                        )}
-                      </div>
-                    </div>
+              {stripeReady === false && !allPlansCovered && (
+                <div className="stripe-unavailable-banner">
+                  <i className="bi bi-credit-card-2-front" />
+                  <div>
+                    <strong>Pagamentos indisponíveis</strong>
+                    <p>O sistema de pagamentos está em manutenção. Tente novamente em alguns minutos.</p>
                   </div>
-                  <ul className="plan-benefits">
-                    {plan.benefits.map((benefit) => (
-                      <li key={benefit}>
-                        <i className="bi bi-check2"></i>
-                        {benefit}
-                      </li>
-                    ))}
-                  </ul>
-                  <button
-                    type="button"
-                    className={`btn-subscribe ${index === 1 ? 'primary' : 'outline'}`}
-                    disabled={checkoutLoading !== null}
-                    onClick={() => handleSubscribe(plan.id)}
-                  >
-                    {checkoutLoading === plan.id ? (
-                      <><span className="btn-spinner" /> Aguarde...</>
-                    ) : (
-                      <>Assinar {index === 0 ? 'agora' : 'plano'}</>
-                    )}
-                  </button>
                 </div>
-              ))}
-            </div>
-          </>
-        )}
+              )}
+              {checkoutError && (
+                <div className="checkout-error-banner">
+                  <i className="bi bi-exclamation-triangle-fill" />
+                  {checkoutError}
+                </div>
+              )}
+              <div className="plans-list">
+                {plans.map((plan, index) => {
+                  const isActive = effectivePlans.has(plan.id)
+                  const expiryIso = sessionUserId
+                    ? loadSession()?.planExpiresAt?.[plan.id]
+                    : undefined
+                  return (
+                    <div key={plan.id} className={`plan-card ${index === 1 ? 'featured' : ''} ${isActive ? 'plan-card-active' : ''}`}>
+                      {index === 1 && !isActive && <span className="plan-featured-badge">mais popular</span>}
+                      {isActive && (
+                        <span className="plan-active-badge">
+                          <i className="bi bi-check-circle-fill" />
+                          Plano ativo
+                        </span>
+                      )}
+                      <div className="plan-card-top">
+                        <div className={`plan-icon ${planIconClass[index]}`}>
+                          <i className={`bi ${planIcons[index]}`}></i>
+                        </div>
+                        <div className="plan-meta">
+                          <div className="plan-name">{plan.label}</div>
+                          <div className="plan-price">
+                            <span className="plan-price-currency">R$</span>
+                            <span className="plan-price-value">
+                              {(plan.priceInCents / 100).toFixed(2).replace('.', ',')}
+                            </span>
+                            {plan.billingInterval === 'monthly' && (
+                              <span className="plan-price-period">/mês</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <ul className="plan-benefits">
+                        {plan.benefits.map((benefit) => (
+                          <li key={benefit}>
+                            <i className="bi bi-check2"></i>
+                            {benefit}
+                          </li>
+                        ))}
+                      </ul>
+                      {isActive ? (
+                        <div className="plan-active-footer">
+                          {expiryIso
+                            ? <>Renovação: <strong>{new Date(typeof expiryIso === 'number' ? expiryIso : Date.parse(String(expiryIso))).toLocaleDateString('pt-BR')}</strong></>
+                            : 'Acesso vitalício'}
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          className={`btn-subscribe ${index === 1 ? 'primary' : 'outline'}`}
+                          disabled={checkoutLoading !== null || stripeReady === false}
+                          onClick={() => handleSubscribe(plan.id)}
+                        >
+                          {checkoutLoading === plan.id ? (
+                            <><span className="btn-spinner" /> Aguarde...</>
+                          ) : (
+                            <>Assinar {index === 0 ? 'agora' : 'plano'}</>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )
+        })()}
 
         {/* MEU GUARDIÃO */}
         {activeSection === 'meuguardiao' && (

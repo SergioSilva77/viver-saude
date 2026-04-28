@@ -14,6 +14,7 @@ import {
   applyWebhookCheckoutCompleted,
   getStripeClient,
 } from './services.js'
+import { getPlan } from '@viver-saude/shared'
 import { config, getStripeConfig, hasStripeConfig, getAiConfig, type StripeFileConfig } from './config.js'
 import { chat, type ChatMessage, type UserProfile } from './ai.js'
 import { recordUsage, getUsageStats, setQuota } from './tokenTracker.js'
@@ -43,8 +44,19 @@ const registerSchema = z.object({
 })
 
 const checkoutSchema = z.object({
-  email: z.email(),
+  // email is optional — Stripe collects it during checkout if not provided
+  // preprocess converts empty string '' to undefined to avoid email format errors
+  email: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.string().email().optional()
+  ),
   planId: z.enum(['nivel1', 'nivel2', 'nivel3']),
+})
+
+const registerPostPaymentSchema = z.object({
+  stripeSessionId: z.string().min(1),
+  fullName: z.string().min(2).max(100),
+  password: z.string().min(8).max(128),
 })
 
 const grantSchema = z.object({
@@ -222,12 +234,123 @@ app.post('/api/onboarding/register-intent', async (req, res) => {
 
 // ── Billing ────────────────────────────────────────────────
 app.post('/api/billing/checkout-session', async (req, res) => {
+  // Defense layer: refuse to create checkout if Stripe isn't configured.
+  // This protects against any frontend bug that would try to bypass payment.
+  if (!hasStripeConfig()) {
+    res.status(503).json({
+      ok: false,
+      code: 'stripe_not_configured',
+      message: 'Pagamentos indisponíveis no momento. Tente novamente mais tarde.',
+    })
+    return
+  }
+
   try {
     const payload = checkoutSchema.parse(req.body)
     const session = await createCheckoutSession(payload.planId, payload.email)
-    res.status(201).json({ sessionId: session.id, url: session.url })
+    res.status(201).json({ ok: true, sessionId: session.id, url: session.url })
   } catch (error) {
-    res.status(400).json({ message: error instanceof Error ? error.message : 'Falha ao criar sessão de checkout.' })
+    res.status(400).json({
+      ok: false,
+      code: 'checkout_failed',
+      message: error instanceof Error ? error.message : 'Falha ao criar sessão de checkout.',
+    })
+  }
+})
+
+app.get('/api/billing/verify-session', async (req, res) => {
+  const sessionId = String(req.query.session_id ?? '')
+  if (!sessionId) {
+    res.status(400).json({ message: 'session_id é obrigatório.' })
+    return
+  }
+
+  if (!hasStripeConfig()) {
+    res.status(503).json({ message: 'O Stripe ainda não está configurado.' })
+    return
+  }
+
+  try {
+    const stripe = getStripeClient()
+    const session = await stripe.checkout.sessions.retrieve(sessionId)
+    const paid = session.payment_status === 'paid' || session.status === 'complete'
+    const email = session.customer_details?.email ?? session.customer_email ?? null
+    const planId = (session.metadata?.planId ?? null) as string | null
+
+    if (!paid) {
+      res.status(400).json({ message: 'Pagamento ainda não confirmado.' })
+      return
+    }
+
+    res.json({ ok: true, email, planId, paid })
+  } catch (error) {
+    res.status(400).json({ message: error instanceof Error ? error.message : 'Sessão inválida.' })
+  }
+})
+
+app.post('/api/auth/register', async (req, res) => {
+  if (!hasStripeConfig()) {
+    res.status(503).json({ message: 'O Stripe ainda não está configurado.' })
+    return
+  }
+
+  try {
+    const { stripeSessionId, fullName, password } = registerPostPaymentSchema.parse(req.body)
+
+    // Verify payment with Stripe
+    const stripe = getStripeClient()
+    const session = await stripe.checkout.sessions.retrieve(stripeSessionId)
+    const paid = session.payment_status === 'paid' || session.status === 'complete'
+
+    if (!paid) {
+      res.status(400).json({ message: 'Pagamento não confirmado. Conclua o pagamento antes de criar sua conta.' })
+      return
+    }
+
+    const email = session.customer_details?.email ?? session.customer_email
+    if (!email) {
+      res.status(400).json({ message: 'E-mail não encontrado na sessão do Stripe.' })
+      return
+    }
+
+    const planId = (session.metadata?.planId ?? 'nivel1') as string
+
+    // Prevent duplicate registration
+    const existing = findByEmail(email)
+    if (existing) {
+      res.status(409).json({ message: 'Esta conta já foi criada. Faça login para acessar.' })
+      return
+    }
+
+    // Calculate plan expiry
+    const plan = getPlan(planId as 'nivel1' | 'nivel2' | 'nivel3')
+    const expiresIso = plan.billingInterval === 'monthly'
+      ? (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString() })()
+      : null
+
+    const newUser = upsertUser({
+      id: `stripe_${stripeSessionId.slice(-12)}`,
+      email,
+      fullName,
+      planIds: [planId],
+      password,
+      planExpiresAt: expiresIso ? { [planId]: expiresIso } : undefined,
+    })
+
+    const planExpiresAtMs: Record<string, number> = {}
+    for (const [pid, iso] of Object.entries(newUser.planExpiresAt ?? {})) {
+      if (iso) planExpiresAtMs[pid] = new Date(iso).getTime()
+    }
+
+    res.status(201).json({
+      ok: true,
+      userId: newUser.id,
+      email: newUser.email,
+      planIds: newUser.planIds,
+      planExpiresAt: planExpiresAtMs,
+    })
+  } catch (error) {
+    res.status(400).json({ message: error instanceof Error ? error.message : 'Falha ao criar conta.' })
   }
 })
 

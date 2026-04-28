@@ -76,7 +76,7 @@ export async function registerPendingUser(input: RegisterIntentInput) {
   }
 }
 
-export async function createCheckoutSession(planId: PlanId, customerEmail: string) {
+export async function createCheckoutSession(planId: PlanId, customerEmail?: string) {
   const stripe = getStripeClient()
   const stripeConf = getStripeConfig()
   const plan = getPlan(planId)
@@ -85,9 +85,11 @@ export async function createCheckoutSession(planId: PlanId, customerEmail: strin
 
   return stripe.checkout.sessions.create({
     mode,
-    customer_email: customerEmail,
-    success_url: `${config.appUrl}/?checkout=success&plan=${planId}`,
-    cancel_url:  `${config.appUrl}/?checkout=cancelled&plan=${planId}`,
+    // customer_email is optional — Stripe collects it during checkout if not provided
+    ...(customerEmail ? { customer_email: customerEmail } : {}),
+    // {CHECKOUT_SESSION_ID} is a Stripe template placeholder replaced automatically
+    success_url: `${config.appUrl}/?checkout=success&plan=${planId}&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url:  `${config.appUrl}/?checkout=cancelled`,
     metadata: {
       planId,
       app: 'viver-saude',

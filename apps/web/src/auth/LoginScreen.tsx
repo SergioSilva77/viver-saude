@@ -5,6 +5,8 @@ import { saveSession } from './sessionTypes'
 import { devAuthenticate } from './devAuth'
 import type { PlanId } from '@viver-saude/shared'
 
+type SubscribeState = 'idle' | 'loading' | 'error'
+
 const GUARDIAO_24H_MS = 24 * 60 * 60 * 1000
 
 // ── Auth error messages ────────────────────────────────────
@@ -31,17 +33,32 @@ type LoginState = 'idle' | 'loading' | 'error'
 
 interface Props {
   onLogin: (planIds: PlanId[]) => void
+  onSubscribe: (planId: PlanId) => Promise<void>
+  /** Success banner shown after registration redirect — also hides "Assinar" button */
+  successMessage?: string
+  /** Email pre-filled after registration redirect */
+  prefilledEmail?: string
+  /**
+   * `true`  → Stripe configured, can subscribe
+   * `false` → Stripe NOT configured, disable subscribe and show banner
+   * `null`  → still checking
+   */
+  stripeReady?: boolean | null
 }
 
-export function LoginScreen({ onLogin }: Props) {
+export function LoginScreen({ onLogin, onSubscribe, successMessage, prefilledEmail, stripeReady = null }: Props) {
   const [loginState, setLoginState] = useState<LoginState>('idle')
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(prefilledEmail ?? '')
   const [password, setPassword] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
 
   const [overlayVisible, setOverlayVisible] = useState(false)
   const [overlayEntered, setOverlayEntered] = useState(false)
   const overlayRef = useRef<HTMLDivElement>(null)
+
+  const [subscribeState, setSubscribeState] = useState<SubscribeState>('idle')
+  const [subscribeError, setSubscribeError] = useState('')
+  const [subscribingPlanId, setSubscribingPlanId] = useState<PlanId | null>(null)
 
   function openPlans() {
     setOverlayVisible(true)
@@ -133,6 +150,13 @@ export function LoginScreen({ onLogin }: Props) {
         </div>
       )}
 
+      {successMessage && (
+        <div className="login-success-banner">
+          <i className="bi bi-check-circle-fill" />
+          {successMessage}
+        </div>
+      )}
+
       <div className="login-brand">
         <div className="login-logo">
           <i className="bi bi-heart-pulse-fill" />
@@ -189,17 +213,20 @@ export function LoginScreen({ onLogin }: Props) {
         <span>Novo por aqui?</span>
       </div>
 
-      <div className="login-subscribe-area">
-        <button
-          type="button"
-          className="btn-login-subscribe"
-          onClick={openPlans}
-          aria-label="Ver planos e assinar"
-        >
-          <i className="bi bi-stars" />
-          Assinar
-        </button>
-      </div>
+      {/* Hide subscribe button after a payment/registration — user must log in */}
+      {!successMessage && (
+        <div className="login-subscribe-area">
+          <button
+            type="button"
+            className="btn-login-subscribe"
+            onClick={openPlans}
+            aria-label="Ver planos e assinar"
+          >
+            <i className="bi bi-stars" />
+            Assinar
+          </button>
+        </div>
+      )}
 
       {overlayVisible && (
         <div
@@ -227,6 +254,21 @@ export function LoginScreen({ onLogin }: Props) {
           </div>
 
           <div className="plans-overlay-body">
+            {stripeReady === false && (
+              <div className="stripe-unavailable-banner">
+                <i className="bi bi-credit-card-2-front" />
+                <div>
+                  <strong>Pagamentos indisponíveis</strong>
+                  <p>O sistema de pagamentos está em manutenção. Tente novamente em alguns minutos.</p>
+                </div>
+              </div>
+            )}
+            {subscribeError && (
+              <div className="checkout-error-banner" style={{ marginBottom: '1rem' }}>
+                <i className="bi bi-exclamation-triangle-fill" />
+                {subscribeError}
+              </div>
+            )}
             <div className="plans-list">
               {plans.map((plan, index) => (
                 <div
@@ -264,18 +306,29 @@ export function LoginScreen({ onLogin }: Props) {
                   <button
                     type="button"
                     className={`btn-subscribe ${index === 1 ? 'primary' : 'outline'}`}
-                    onClick={() => {
-                      const planIds: PlanId[] = [plan.id as PlanId]
-                      saveSession({
-                        userId: 'new-user',
-                        email: 'novo@usuario.com',
-                        planIds,
-                        guardiao24hUnlockedUntil: plan.id === 'nivel1' ? Date.now() + GUARDIAO_24H_MS : null,
-                      })
-                      onLogin(planIds)
+                    disabled={subscribeState === 'loading' || stripeReady === false}
+                    onClick={async () => {
+                      setSubscribeError('')
+                      setSubscribeState('loading')
+                      setSubscribingPlanId(plan.id)
+                      let didFail = false
+                      try {
+                        await onSubscribe(plan.id)
+                      } catch (err) {
+                        didFail = true
+                        const msg = err instanceof Error ? err.message : 'Erro desconhecido ao iniciar o checkout.'
+                        setSubscribeError(msg)
+                        setSubscribeState('error')
+                      } finally {
+                        setSubscribingPlanId(null)
+                        if (!didFail) setSubscribeState('idle')
+                      }
                     }}
                   >
-                    Assinar {index === 0 ? 'agora' : 'plano'}
+                    {subscribeState === 'loading' && subscribingPlanId === plan.id
+                      ? <><span className="btn-spinner" /> Aguarde...</>
+                      : <>Assinar {index === 0 ? 'agora' : 'plano'}</>
+                    }
                   </button>
                 </div>
               ))}

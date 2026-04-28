@@ -1,11 +1,9 @@
-agora precisamos testar cautelosamente a parte de assinatura. desde cancelamento até assinatura com sucesso
-ao assinar com sucesso o nivel 1, a pessoa sera direcionada para a tela de cadastro e atualizar os dados dela. será dado boas vindas pra ela
-vc vai precisar ser oganizado com webhooks e clareza na organizacao. 
-nao espalhe configuracoes, centralize de forma padrao para boa manutencao futura.
-já configurei os ids no painel admin. agora precisamos testar e validar se ira funcionar ou nao
-apos inseerir os dados na stripe ir com sucesso, precisa marcar no banco que a pessoa pagou aquele nivel.
-no painel admin, colocar quando vai expirar aquele nivel da pessoa.
-quando expirar, tornar a bloquear automaticamente aquele nivel até a pessoa pagar novamente.
+quando a pessoa pagar uma assinatura:
+1. retirar aquele bloco de assinatura, depois que assinar um nivel
+2. direcionar a pessoa para uma tela especial de cadastro: colocando email, senha, etc... (ainda nao funcional)
+3. após esse cadastro depois de salvar, matar a sessão da pessoa pra ela fazer Login
+4. a pessoa ainda nao fez login, mas clicou em assinar. nesse momento, ela não é direcionada para a stripe, mas sim dentro do aplicativo e o aplicativo desboloqueia o nivel para ela sendo que nao deveria... isso é um falso positivo. a pessoa clicou em assinar e desbloqueou o nivel sem passar pela stripe na tela do login onde tem usuario e senha.
+5. confira
 
 
 
