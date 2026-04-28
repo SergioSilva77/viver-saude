@@ -201,7 +201,7 @@ app.use(helmet())
 app.use(morgan('dev'))
 
 // ── Health ─────────────────────────────────────────────────
-app.get('/health', (_req, res) => {
+app.get(['/health', '/api/health'], (_req, res) => {
   const aiConfig = getAiConfig()
   res.json({
     status: 'ok',
