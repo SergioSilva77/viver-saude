@@ -21,6 +21,7 @@ import { config, getStripeConfig, hasStripeConfig, getAiConfig, type StripeFileC
 import { chat, type ChatMessage, type UserProfile } from './ai.js'
 import { recordUsage, getUsageStats, setQuota } from './tokenTracker.js'
 import { listUsers, upsertUser, removeUser, findByEmail } from './userStore.js'
+import { listCommunityLinks, upsertCommunityLink, removeCommunityLink, type CommunityPlatform } from './communityStore.js'
 import {
   loadManifest,
   removeManifestEntry,
@@ -379,6 +380,54 @@ app.post('/api/billing/cancel-subscription', async (req, res) => {
   } catch (error) {
     res.status(400).json({ ok: false, message: error instanceof Error ? error.message : 'Falha ao cancelar assinatura.' })
   }
+})
+
+// ── Community links (public) ────────────────────────────────
+app.get('/api/community-links', (_req, res) => {
+  res.json({ links: listCommunityLinks() })
+})
+
+// ── Community links (admin) ─────────────────────────────────
+const communityLinkSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1).max(120),
+  platform: z.enum(['whatsapp', 'telegram', 'youtube', 'discord', 'other']),
+  audience: z.array(z.string()).default([]),
+  href: z.string().url(),
+})
+
+app.get('/api/admin/community-links', (req, res) => {
+  if (req.headers['x-admin-token'] !== process.env.ADMIN_TOKEN) {
+    res.status(401).json({ message: 'Não autorizado.' })
+    return
+  }
+  res.json({ links: listCommunityLinks() })
+})
+
+app.post('/api/admin/community-links', (req, res) => {
+  if (req.headers['x-admin-token'] !== process.env.ADMIN_TOKEN) {
+    res.status(401).json({ message: 'Não autorizado.' })
+    return
+  }
+  try {
+    const payload = communityLinkSchema.parse(req.body)
+    const link = upsertCommunityLink({
+      ...payload,
+      platform: payload.platform as CommunityPlatform,
+    })
+    res.status(201).json({ ok: true, link })
+  } catch (error) {
+    res.status(400).json({ message: error instanceof Error ? error.message : 'Dados inválidos.' })
+  }
+})
+
+app.delete('/api/admin/community-links/:id', (req, res) => {
+  if (req.headers['x-admin-token'] !== process.env.ADMIN_TOKEN) {
+    res.status(401).json({ message: 'Não autorizado.' })
+    return
+  }
+  removeCommunityLink(String(req.params.id))
+  res.json({ ok: true })
 })
 
 // ── Admin grants ───────────────────────────────────────────

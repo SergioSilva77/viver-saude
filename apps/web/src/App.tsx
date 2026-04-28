@@ -9,6 +9,9 @@ import {
   type AppSection,
   type PlanId,
 } from '@viver-saude/shared'
+
+type CommunityPlatform = 'whatsapp' | 'telegram' | 'youtube' | 'discord' | 'other'
+interface CommunityLink { id: string; title: string; platform: CommunityPlatform; audience: string[]; href: string }
 import { LoginScreen } from './auth/LoginScreen'
 import { RegisterScreen } from './auth/RegisterScreen'
 import { MeuGuardiao } from './guardiao/MeuGuardiao'
@@ -20,6 +23,21 @@ import './App.css'
 
 const planIcons = ['bi-seedling', 'bi-heart-pulse', 'bi-stars']
 const planIconClass = ['n1', 'n2', 'n3']
+
+const PLATFORM_ICON: Record<CommunityPlatform, string> = {
+  whatsapp: 'bi-whatsapp',
+  telegram: 'bi-telegram',
+  youtube: 'bi-youtube',
+  discord: 'bi-discord',
+  other: 'bi-link-45deg',
+}
+const PLATFORM_LABEL: Record<CommunityPlatform, string> = {
+  whatsapp: 'WhatsApp',
+  telegram: 'Telegram',
+  youtube: 'YouTube',
+  discord: 'Discord',
+  other: 'Link',
+}
 
 /**
  * Plan hierarchy: a higher tier covers lower tiers.
@@ -282,6 +300,9 @@ function App() {
   // Pre-flight: is Stripe configured on the backend? null = checking
   const [stripeReady, setStripeReady] = useState<boolean | null>(null)
 
+  // Community links fetched from API
+  const [communityLinks, setCommunityLinks] = useState<CommunityLink[]>([])
+
   // Confirm dialog ref (for consultant)
   const consultorConfirmedRef = useRef(false)
 
@@ -300,6 +321,16 @@ function App() {
     return () => {
       cancelled = true
     }
+  }, [])
+
+  // Fetch community links from backend
+  useEffect(() => {
+    fetch('/api/community-links')
+      .then((r) => r.json())
+      .then((data: { links?: CommunityLink[] }) => {
+        if (data.links) setCommunityLinks(data.links)
+      })
+      .catch(() => { /* silently fall back to empty list */ })
   }, [])
 
   useEffect(() => {
@@ -743,28 +774,43 @@ function App() {
             <LockedSection section="comunidade" onViewPlans={goToPlans}>
               <ComunidadePreview />
             </LockedSection>
-          ) : (
-            <>
-              <div>
-                <h2 className="section-title">Comunidade</h2>
-                <p className="section-sub">Grupos exclusivos por plano</p>
-              </div>
-              <div className="cards-list">
-                {sampleCommunityLinks.map((link) => (
-                  <button type="button" className="content-card" key={link.id}>
-                    <div className="content-card-icon">
-                      <i className={`bi ${link.platform === 'whatsapp' ? 'bi-whatsapp' : 'bi-telegram'}`}></i>
-                    </div>
-                    <div className="content-card-body">
-                      <div className="content-card-title">{link.title}</div>
-                      <div className="content-card-sub">{link.platform}</div>
-                    </div>
-                    <i className="bi bi-chevron-right content-card-arrow"></i>
-                  </button>
-                ))}
-              </div>
-            </>
-          )
+          ) : (() => {
+            const expanded = expandPlanHierarchy(activePlans)
+            const visibleLinks = communityLinks.filter(
+              (link) => link.audience.length === 0 || link.audience.some((a) => expanded.has(a as PlanId)),
+            )
+            return (
+              <>
+                <div>
+                  <h2 className="section-title">Comunidade</h2>
+                  <p className="section-sub">Grupos exclusivos por plano</p>
+                </div>
+                <div className="cards-list">
+                  {visibleLinks.length === 0 && (
+                    <p className="community-empty">Nenhum grupo disponível para o seu plano no momento.</p>
+                  )}
+                  {visibleLinks.map((link) => (
+                    <a
+                      href={link.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="content-card"
+                      key={link.id}
+                    >
+                      <div className="content-card-icon">
+                        <i className={`bi ${PLATFORM_ICON[link.platform] ?? 'bi-link-45deg'}`}></i>
+                      </div>
+                      <div className="content-card-body">
+                        <div className="content-card-title">{link.title}</div>
+                        <div className="content-card-sub">{PLATFORM_LABEL[link.platform] ?? link.platform}</div>
+                      </div>
+                      <i className="bi bi-chevron-right content-card-arrow"></i>
+                    </a>
+                  ))}
+                </div>
+              </>
+            )
+          })()
         )}
 
         {/* CONTA */}

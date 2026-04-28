@@ -5,6 +5,7 @@ import { CreateUserModal } from './CreateUserModal'
 import { AiSettingsPage } from './settings/AiSettingsPage'
 import { StripeSettingsPage } from './settings/StripeSettingsPage'
 import { TokenUsagePage } from './settings/TokenUsagePage'
+import { CommunityPage } from './CommunityPage'
 import { AdminLogin } from './auth/AdminLogin'
 import { loadAdminSession, clearAdminSession } from './auth/adminSession'
 import { loadUsers, persistUsers, type AdminSection, type AdminUser } from './types'
@@ -12,6 +13,7 @@ import './App.css'
 
 const NAV_ITEMS: { id: AdminSection; icon: string; label: string }[] = [
   { id: 'usuarios', icon: 'bi-people-fill', label: 'Usuários' },
+  { id: 'comunidade', icon: 'bi-people-fill', label: 'Comunidade' },
   { id: 'receitas', icon: 'bi-journal-medical', label: 'Receitas' },
   { id: 'mensagens', icon: 'bi-chat-dots-fill', label: 'Mensagens' },
   { id: 'concessoes', icon: 'bi-stars', label: 'Concessões' },
@@ -178,6 +180,13 @@ function App() {
           {activeSection === 'tokens' && (
             <TokenUsagePage
               apiUrl=""
+              adminToken={import.meta.env.VITE_ADMIN_TOKEN ?? 'vs-admin-dev'}
+            />
+          )}
+
+          {/* ── COMUNIDADE ───────────────────────────────── */}
+          {activeSection === 'comunidade' && (
+            <CommunityPage
               adminToken={import.meta.env.VITE_ADMIN_TOKEN ?? 'vs-admin-dev'}
             />
           )}
