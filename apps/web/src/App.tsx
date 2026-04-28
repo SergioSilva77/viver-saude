@@ -1,4 +1,5 @@
-import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState, useMemo } from 'react'
+import { marked } from 'marked'
 import {
   bottomNavItems,
   getSectionAccessForPlans,
@@ -12,6 +13,9 @@ import {
 
 type CommunityPlatform = 'whatsapp' | 'telegram' | 'youtube' | 'discord' | 'other'
 interface CommunityLink { id: string; title: string; platform: CommunityPlatform; audience: string[]; href: string }
+
+interface RecipeMeta { id: string; title: string; description: string; audience: string[]; updatedAt: string }
+interface RecipeFull extends RecipeMeta { content: string }
 import { LoginScreen } from './auth/LoginScreen'
 import { RegisterScreen } from './auth/RegisterScreen'
 import { MeuGuardiao } from './guardiao/MeuGuardiao'
@@ -184,6 +188,20 @@ function ComunidadePreview() {
   )
 }
 
+function RecipeDetail({ recipe, onBack }: { recipe: RecipeFull; onBack: () => void }) {
+  const html = useMemo(() => marked.parse(recipe.content) as string, [recipe.content])
+  return (
+    <div className="recipe-detail">
+      <button type="button" className="recipe-back-btn" onClick={onBack}>
+        <i className="bi bi-arrow-left" /> Voltar
+      </button>
+      <h2 className="recipe-detail-title">{recipe.title}</h2>
+      {recipe.description && <p className="recipe-detail-sub">{recipe.description}</p>}
+      <div className="recipe-detail-body" dangerouslySetInnerHTML={{ __html: html }} />
+    </div>
+  )
+}
+
 function ContaPreview() {
   return (
     <>
@@ -303,6 +321,11 @@ function App() {
   // Community links fetched from API
   const [communityLinks, setCommunityLinks] = useState<CommunityLink[]>([])
 
+  // Recipes fetched from API
+  const [recipesMeta, setRecipesMeta] = useState<RecipeMeta[]>([])
+  const [selectedRecipe, setSelectedRecipe] = useState<RecipeFull | null>(null)
+  const [recipeLoading, setRecipeLoading] = useState(false)
+
   // Confirm dialog ref (for consultant)
   const consultorConfirmedRef = useRef(false)
 
@@ -329,6 +352,16 @@ function App() {
       .then((r) => r.json())
       .then((data: { links?: CommunityLink[] }) => {
         if (data.links) setCommunityLinks(data.links)
+      })
+      .catch(() => { /* silently fall back to empty list */ })
+  }, [])
+
+  // Fetch recipe list from backend
+  useEffect(() => {
+    fetch('/api/recipes')
+      .then((r) => r.json())
+      .then((data: { recipes?: RecipeMeta[] }) => {
+        if (data.recipes) setRecipesMeta(data.recipes)
       })
       .catch(() => { /* silently fall back to empty list */ })
   }, [])
@@ -744,28 +777,60 @@ function App() {
             <LockedSection section="receitas" onViewPlans={goToPlans}>
               <ReceitasPreview />
             </LockedSection>
-          ) : (
-            <>
-              <div>
-                <h2 className="section-title">Receitas</h2>
-                <p className="section-sub">Protocolos e e-books naturais</p>
-              </div>
-              <div className="cards-list">
-                {sampleRecipes.map((recipe) => (
-                  <button type="button" className="content-card" key={recipe.id}>
-                    <div className="content-card-icon">
-                      <i className={`bi ${recipe.assetType === 'ebook' ? 'bi-book' : recipe.assetType === 'protocol' ? 'bi-clipboard2-heart' : 'bi-cup-hot'}`}></i>
-                    </div>
-                    <div className="content-card-body">
-                      <div className="content-card-title">{recipe.title}</div>
-                      <div className="content-card-sub">{recipe.category}</div>
-                    </div>
-                    <i className="bi bi-chevron-right content-card-arrow"></i>
-                  </button>
-                ))}
-              </div>
-            </>
-          )
+          ) : selectedRecipe ? (
+            <RecipeDetail
+              recipe={selectedRecipe}
+              onBack={() => setSelectedRecipe(null)}
+            />
+          ) : (() => {
+            const expanded = expandPlanHierarchy(activePlans)
+            const visibleRecipes = recipesMeta.filter(
+              (r) => r.audience.length === 0 || r.audience.some((a) => expanded.has(a as PlanId)),
+            )
+            async function openRecipe(id: string) {
+              setRecipeLoading(true)
+              try {
+                const res = await fetch(`/api/recipes/${id}`)
+                const data = await res.json() as { recipe?: RecipeFull }
+                if (data.recipe) setSelectedRecipe(data.recipe)
+              } finally {
+                setRecipeLoading(false)
+              }
+            }
+            return (
+              <>
+                <div>
+                  <h2 className="section-title">Receitas</h2>
+                  <p className="section-sub">Protocolos e e-books naturais</p>
+                </div>
+                <div className="cards-list">
+                  {visibleRecipes.length === 0 && (
+                    <p className="community-empty">Nenhuma receita disponível para o seu plano no momento.</p>
+                  )}
+                  {recipeLoading && <p className="community-empty">Carregando…</p>}
+                  {visibleRecipes.map((recipe) => (
+                    <button
+                      type="button"
+                      className="content-card"
+                      key={recipe.id}
+                      onClick={() => openRecipe(recipe.id)}
+                    >
+                      <div className="content-card-icon">
+                        <i className="bi bi-journal-medical"></i>
+                      </div>
+                      <div className="content-card-body">
+                        <div className="content-card-title">{recipe.title}</div>
+                        {recipe.description && (
+                          <div className="content-card-sub">{recipe.description}</div>
+                        )}
+                      </div>
+                      <i className="bi bi-chevron-right content-card-arrow"></i>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )
+          })()
         )}
 
         {/* COMUNIDADE */}

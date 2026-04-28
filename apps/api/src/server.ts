@@ -22,6 +22,7 @@ import { chat, type ChatMessage, type UserProfile } from './ai.js'
 import { recordUsage, getUsageStats, setQuota } from './tokenTracker.js'
 import { listUsers, upsertUser, removeUser, findByEmail } from './userStore.js'
 import { listCommunityLinks, upsertCommunityLink, removeCommunityLink, type CommunityPlatform } from './communityStore.js'
+import { listRecipes, listRecipesMeta, getRecipeById, upsertRecipe, removeRecipe } from './recipeStore.js'
 import {
   loadManifest,
   removeManifestEntry,
@@ -380,6 +381,48 @@ app.post('/api/billing/cancel-subscription', async (req, res) => {
   } catch (error) {
     res.status(400).json({ ok: false, message: error instanceof Error ? error.message : 'Falha ao cancelar assinatura.' })
   }
+})
+
+// ── Recipes (public) ───────────────────────────────────────
+app.get('/api/recipes', (_req, res) => {
+  res.json({ recipes: listRecipesMeta() })
+})
+
+app.get('/api/recipes/:id', (req, res) => {
+  const recipe = getRecipeById(String(req.params.id))
+  if (!recipe) {
+    res.status(404).json({ message: 'Receita não encontrada.' })
+    return
+  }
+  res.json({ recipe })
+})
+
+// ── Recipes (admin) ─────────────────────────────────────────
+const recipeSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1).max(200),
+  description: z.string().max(400).default(''),
+  content: z.string().min(1),
+  audience: z.array(z.string()).default([]),
+})
+
+app.get('/api/admin/recipes', requireAdminToken, (_req, res) => {
+  res.json({ recipes: listRecipes() })
+})
+
+app.post('/api/admin/recipes', requireAdminToken, (req, res) => {
+  try {
+    const payload = recipeSchema.parse(req.body)
+    const recipe = upsertRecipe(payload)
+    res.status(201).json({ ok: true, recipe })
+  } catch (error) {
+    res.status(400).json({ message: error instanceof Error ? error.message : 'Dados inválidos.' })
+  }
+})
+
+app.delete('/api/admin/recipes/:id', requireAdminToken, (req, res) => {
+  removeRecipe(String(req.params.id))
+  res.json({ ok: true })
 })
 
 // ── Community links (public) ────────────────────────────────

@@ -6,6 +6,7 @@ import { AiSettingsPage } from './settings/AiSettingsPage'
 import { StripeSettingsPage } from './settings/StripeSettingsPage'
 import { TokenUsagePage } from './settings/TokenUsagePage'
 import { CommunityPage } from './CommunityPage'
+import { RecipesPage } from './RecipesPage'
 import { AdminLogin } from './auth/AdminLogin'
 import { loadAdminSession, clearAdminSession } from './auth/adminSession'
 import { loadUsers, persistUsers, type AdminSection, type AdminUser } from './types'
@@ -139,13 +140,9 @@ function App() {
 
           {/* ── RECEITAS ─────────────────────────────────── */}
           {activeSection === 'receitas' && (
-            <div className="placeholder-section">
-              <div className="placeholder-icon">
-                <i className="bi bi-journal-medical"></i>
-              </div>
-              <h2>Receitas</h2>
-              <p>Gestão de receitas, protocolos e e-books. Em breve.</p>
-            </div>
+            <RecipesPage
+              adminToken={import.meta.env.VITE_ADMIN_TOKEN ?? 'vs-admin-dev'}
+            />
           )}
 
           {/* ── MENSAGENS ────────────────────────────────── */}
