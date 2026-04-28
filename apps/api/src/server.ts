@@ -396,19 +396,11 @@ const communityLinkSchema = z.object({
   href: z.string().url(),
 })
 
-app.get('/api/admin/community-links', (req, res) => {
-  if (req.headers['x-admin-token'] !== process.env.ADMIN_TOKEN) {
-    res.status(401).json({ message: 'Não autorizado.' })
-    return
-  }
+app.get('/api/admin/community-links', requireAdminToken, (_req, res) => {
   res.json({ links: listCommunityLinks() })
 })
 
-app.post('/api/admin/community-links', (req, res) => {
-  if (req.headers['x-admin-token'] !== process.env.ADMIN_TOKEN) {
-    res.status(401).json({ message: 'Não autorizado.' })
-    return
-  }
+app.post('/api/admin/community-links', requireAdminToken, (req, res) => {
   try {
     const payload = communityLinkSchema.parse(req.body)
     const link = upsertCommunityLink({
@@ -421,11 +413,7 @@ app.post('/api/admin/community-links', (req, res) => {
   }
 })
 
-app.delete('/api/admin/community-links/:id', (req, res) => {
-  if (req.headers['x-admin-token'] !== process.env.ADMIN_TOKEN) {
-    res.status(401).json({ message: 'Não autorizado.' })
-    return
-  }
+app.delete('/api/admin/community-links/:id', requireAdminToken, (req, res) => {
   removeCommunityLink(String(req.params.id))
   res.json({ ok: true })
 })

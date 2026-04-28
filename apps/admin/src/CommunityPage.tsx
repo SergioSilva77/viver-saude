@@ -1,5 +1,11 @@
 import { useEffect, useReducer, useState } from 'react'
 
+// ── Helpers ────────────────────────────────────────────────
+
+function generateId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
+}
+
 // ── Types ──────────────────────────────────────────────────
 
 type Platform = 'whatsapp' | 'telegram' | 'youtube' | 'discord' | 'other'
@@ -93,7 +99,7 @@ export function CommunityPage({ adminToken }: Props) {
   useEffect(() => { fetchLinks() }, [])
 
   function openCreate() {
-    setForm({ ...emptyForm, id: crypto.randomUUID() })
+    setForm({ ...emptyForm, id: generateId() })
     setEditingId(null)
     setSaveError(null)
     setShowForm(true)
