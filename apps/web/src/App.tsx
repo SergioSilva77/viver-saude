@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef, useState, useMemo } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { marked } from 'marked'
 import {
   bottomNavItems,
@@ -189,7 +189,12 @@ function ComunidadePreview() {
 }
 
 function RecipeDetail({ recipe, onBack }: { recipe: RecipeFull; onBack: () => void }) {
-  const html = useMemo(() => marked.parse(recipe.content) as string, [recipe.content])
+  const [html, setHtml] = useState('')
+
+  useEffect(() => {
+    Promise.resolve(marked.parse(recipe.content)).then(setHtml)
+  }, [recipe.content])
+
   return (
     <div className="recipe-detail">
       <button type="button" className="recipe-back-btn" onClick={onBack}>
