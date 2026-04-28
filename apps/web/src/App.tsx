@@ -1,5 +1,46 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react'
-import { marked } from 'marked'
+/** Lightweight markdown → HTML (headings, bold, italic, lists, paragraphs) */
+function mdToHtml(md: string): string {
+  const lines = md.split('\n')
+  const out: string[] = []
+  let inList = false
+
+  for (const raw of lines) {
+    const line = raw
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      // inline: bold, italic
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+
+    if (/^### /.test(line)) {
+      if (inList) { out.push('</ul>'); inList = false }
+      out.push(`<h3>${line.slice(4)}</h3>`)
+    } else if (/^## /.test(line)) {
+      if (inList) { out.push('</ul>'); inList = false }
+      out.push(`<h2>${line.slice(3)}</h2>`)
+    } else if (/^# /.test(line)) {
+      if (inList) { out.push('</ul>'); inList = false }
+      out.push(`<h1>${line.slice(2)}</h1>`)
+    } else if (/^- /.test(line)) {
+      if (!inList) { out.push('<ul>'); inList = true }
+      out.push(`<li>${line.slice(2)}</li>`)
+    } else if (/^\d+\. /.test(line)) {
+      if (inList) { out.push('</ul>'); inList = false }
+      out.push(`<li>${line.replace(/^\d+\. /, '')}</li>`)
+    } else if (line.trim() === '') {
+      if (inList) { out.push('</ul>'); inList = false }
+      out.push('<br>')
+    } else {
+      if (inList) { out.push('</ul>'); inList = false }
+      out.push(`<p>${line}</p>`)
+    }
+  }
+
+  if (inList) out.push('</ul>')
+  return out.join('\n')
+}
 import {
   bottomNavItems,
   getSectionAccessForPlans,
@@ -189,12 +230,7 @@ function ComunidadePreview() {
 }
 
 function RecipeDetail({ recipe, onBack }: { recipe: RecipeFull; onBack: () => void }) {
-  const [html, setHtml] = useState('')
-
-  useEffect(() => {
-    Promise.resolve(marked.parse(recipe.content)).then(setHtml)
-  }, [recipe.content])
-
+  const html = mdToHtml(recipe.content)
   return (
     <div className="recipe-detail">
       <button type="button" className="recipe-back-btn" onClick={onBack}>
