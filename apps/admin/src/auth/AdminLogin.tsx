@@ -125,6 +125,54 @@ export function AdminLogin({ onLogin }: Props) {
 
   return (
     <div className="admin-login-screen">
+
+      {/* Animated plant decorations */}
+      <div className="login-plants" aria-hidden="true">
+        {/* Bottom-left large tropical leaf */}
+        <svg className="login-plant-bl" viewBox="0 0 200 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M100 290 C80 250 20 200 10 120 C0 40 60 10 100 5 C140 10 200 40 190 120 C180 200 120 250 100 290Z" fill="#3eb87a"/>
+          <path d="M100 290 C100 200 100 100 100 5" stroke="#1a6640" strokeWidth="3" opacity="0.5"/>
+          <path d="M100 200 C70 170 30 150 10 120" stroke="#1a6640" strokeWidth="2" opacity="0.3"/>
+          <path d="M100 200 C130 170 170 150 190 120" stroke="#1a6640" strokeWidth="2" opacity="0.3"/>
+          <path d="M100 140 C75 115 40 105 20 90" stroke="#1a6640" strokeWidth="1.5" opacity="0.2"/>
+          <path d="M100 140 C125 115 160 105 180 90" stroke="#1a6640" strokeWidth="1.5" opacity="0.2"/>
+          {/* Second leaf */}
+          <path d="M60 280 C30 230 5 160 20 90 C35 30 70 15 90 10 C60 80 55 170 60 280Z" fill="#2d9e68" opacity="0.7"/>
+        </svg>
+
+        {/* Bottom-right plant */}
+        <svg className="login-plant-br" viewBox="0 0 180 260" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M90 250 C75 210 15 165 8 95 C0 30 55 8 90 5 C125 8 180 30 172 95 C165 165 105 210 90 250Z" fill="#3eb87a"/>
+          <path d="M90 250 C90 170 90 80 90 5" stroke="#1a6640" strokeWidth="3" opacity="0.5"/>
+          <path d="M90 170 C60 145 25 130 8 100" stroke="#1a6640" strokeWidth="2" opacity="0.3"/>
+          <path d="M90 170 C120 145 155 130 172 100" stroke="#1a6640" strokeWidth="2" opacity="0.3"/>
+          {/* Smaller side leaf */}
+          <path d="M130 240 C160 190 175 130 162 70 C148 20 118 10 100 8 C125 60 135 155 130 240Z" fill="#2d9e68" opacity="0.6"/>
+        </svg>
+
+        {/* Top-right hanging leaf */}
+        <svg className="login-plant-tr" viewBox="0 0 120 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M60 0 C80 40 100 100 90 160 C80 200 40 210 20 170 C0 130 10 60 60 0Z" fill="#3eb87a"/>
+          <path d="M60 0 C60 80 60 140 60 200" stroke="#1a6640" strokeWidth="2.5" opacity="0.5"/>
+          <path d="M60 80 C45 60 20 55 8 40" stroke="#1a6640" strokeWidth="1.5" opacity="0.3"/>
+          <path d="M60 80 C75 60 95 55 108 40" stroke="#1a6640" strokeWidth="1.5" opacity="0.3"/>
+        </svg>
+
+        {/* Top-left accent leaf */}
+        <svg className="login-plant-tl" viewBox="0 0 90 130" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M45 0 C60 30 75 75 65 110 C55 135 25 140 12 110 C-2 80 8 35 45 0Z" fill="#4caf8c"/>
+          <path d="M45 0 C45 50 45 100 45 130" stroke="#1a6640" strokeWidth="2" opacity="0.4"/>
+        </svg>
+
+        {/* Floating bubbles */}
+        <div className="login-bubble login-bubble-1" />
+        <div className="login-bubble login-bubble-2" />
+        <div className="login-bubble login-bubble-3" />
+        <div className="login-bubble login-bubble-4" />
+        <div className="login-bubble login-bubble-5" />
+        <div className="login-bubble login-bubble-6" />
+      </div>
+
       <div className="admin-login-card">
         {/* Brand */}
         <div className="admin-login-brand">
