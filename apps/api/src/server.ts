@@ -55,6 +55,7 @@ const checkoutSchema = z.object({
     z.string().email().optional()
   ),
   planId: z.enum(['nivel1', 'nivel2', 'nivel3']),
+  fullName: z.string().min(2).max(100).optional(),
 })
 
 const registerPostPaymentSchema = z.object({
@@ -255,7 +256,7 @@ app.post('/api/billing/checkout-session', async (req, res) => {
 
   try {
     const payload = checkoutSchema.parse(req.body)
-    const session = await createCheckoutSession(payload.planId, payload.email)
+    const session = await createCheckoutSession(payload.planId, payload.email, payload.fullName)
     res.status(201).json({ ok: true, sessionId: session.id, url: session.url })
   } catch (error) {
     res.status(400).json({
@@ -284,13 +285,14 @@ app.get('/api/billing/verify-session', async (req, res) => {
     const paid = session.payment_status === 'paid' || session.status === 'complete'
     const email = session.customer_details?.email ?? session.customer_email ?? null
     const planId = (session.metadata?.planId ?? null) as string | null
+    const fullName = (session.metadata?.fullName ?? null) as string | null
 
     if (!paid) {
       res.status(400).json({ message: 'Pagamento ainda não confirmado.' })
       return
     }
 
-    res.json({ ok: true, email, planId, paid })
+    res.json({ ok: true, email, planId, fullName, paid })
   } catch (error) {
     res.status(400).json({ message: error instanceof Error ? error.message : 'Sessão inválida.' })
   }

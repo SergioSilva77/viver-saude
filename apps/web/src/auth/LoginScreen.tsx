@@ -6,6 +6,7 @@ import { devAuthenticate } from './devAuth'
 import type { PlanId } from '@viver-saude/shared'
 
 type SubscribeState = 'idle' | 'loading' | 'error'
+type OverlayStep = 'plans' | 'user-info'
 
 const GUARDIAO_24H_MS = 24 * 60 * 60 * 1000
 
@@ -33,7 +34,7 @@ type LoginState = 'idle' | 'loading' | 'error'
 
 interface Props {
   onLogin: (planIds: PlanId[]) => void
-  onSubscribe: (planId: PlanId) => Promise<void>
+  onSubscribe: (planId: PlanId, userData: { fullName: string; email: string }) => Promise<void>
   /** Success banner shown after registration redirect — also hides "Assinar" button */
   successMessage?: string
   /** Email pre-filled after registration redirect */
@@ -60,11 +61,57 @@ export function LoginScreen({ onLogin, onSubscribe, successMessage, prefilledEma
   const [subscribeError, setSubscribeError] = useState('')
   const [subscribingPlanId, setSubscribingPlanId] = useState<PlanId | null>(null)
 
+  const [overlayStep, setOverlayStep] = useState<OverlayStep>('plans')
+  const [pendingPlanId, setPendingPlanId] = useState<PlanId | null>(null)
+  const [intentName, setIntentName] = useState('')
+  const [intentEmail, setIntentEmail] = useState('')
+  const [intentError, setIntentError] = useState('')
+
   function openPlans() {
+    setOverlayStep('plans')
+    setPendingPlanId(null)
+    setIntentName('')
+    setIntentEmail('')
+    setIntentError('')
     setOverlayVisible(true)
     requestAnimationFrame(() => {
       requestAnimationFrame(() => setOverlayEntered(true))
     })
+  }
+
+  function handlePlanSelect(planId: PlanId) {
+    setPendingPlanId(planId)
+    setSubscribeError('')
+    setIntentError('')
+    setOverlayStep('user-info')
+  }
+
+  async function handleUserInfoSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!intentName.trim()) {
+      setIntentError('Informe seu nome completo.')
+      return
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(intentEmail.trim())) {
+      setIntentError('Informe um e-mail válido.')
+      return
+    }
+    setIntentError('')
+    setSubscribeError('')
+    setSubscribeState('loading')
+    setSubscribingPlanId(pendingPlanId)
+    let didFail = false
+    try {
+      await onSubscribe(pendingPlanId!, { fullName: intentName.trim(), email: intentEmail.trim() })
+    } catch (err) {
+      didFail = true
+      const msg = err instanceof Error ? err.message : 'Erro desconhecido ao iniciar o checkout.'
+      setSubscribeError(msg)
+      setSubscribeState('error')
+    } finally {
+      setSubscribingPlanId(null)
+      if (!didFail) setSubscribeState('idle')
+    }
   }
 
   function closePlans() {
@@ -240,8 +287,12 @@ export function LoginScreen({ onLogin, onSubscribe, successMessage, prefilledEma
 
           <div className="plans-overlay-header">
             <div>
-              <h2 className="plans-overlay-title">Escolha seu plano</h2>
-              <p className="plans-overlay-sub">Comece sua jornada de saúde hoje</p>
+              <h2 className="plans-overlay-title">
+                {overlayStep === 'plans' ? 'Escolha seu plano' : 'Seus dados'}
+              </h2>
+              <p className="plans-overlay-sub">
+                {overlayStep === 'plans' ? 'Comece sua jornada de saúde hoje' : 'Antes de ir ao pagamento'}
+              </p>
             </div>
             <button
               type="button"
@@ -253,94 +304,167 @@ export function LoginScreen({ onLogin, onSubscribe, successMessage, prefilledEma
             </button>
           </div>
 
+          {/* Stepper */}
+          <div className="overlay-stepper">
+            <div className={`overlay-stepper-step ${overlayStep === 'plans' ? 'active' : 'done'}`}>
+              <span className="overlay-stepper-num">{overlayStep === 'plans' ? '①' : '✓'}</span>
+              <span>Plano</span>
+            </div>
+            <div className="overlay-stepper-line" />
+            <div className={`overlay-stepper-step ${overlayStep === 'user-info' ? 'active' : ''}`}>
+              <span className="overlay-stepper-num">②</span>
+              <span>Seus dados</span>
+            </div>
+            <div className="overlay-stepper-line" />
+            <div className="overlay-stepper-step">
+              <span className="overlay-stepper-num">③</span>
+              <span>Pagamento</span>
+            </div>
+          </div>
+
           <div className="plans-overlay-body">
-            {stripeReady === false && (
-              <div className="stripe-unavailable-banner">
-                <i className="bi bi-credit-card-2-front" />
-                <div>
-                  <strong>Pagamentos indisponíveis</strong>
-                  <p>O sistema de pagamentos está em manutenção. Tente novamente em alguns minutos.</p>
-                </div>
-              </div>
-            )}
-            {subscribeError && (
-              <div className="checkout-error-banner" style={{ marginBottom: '1rem' }}>
-                <i className="bi bi-exclamation-triangle-fill" />
-                {subscribeError}
-              </div>
-            )}
-            <div className="plans-list">
-              {plans.map((plan, index) => (
-                <div
-                  key={plan.id}
-                  className={`plan-card ${index === 1 ? 'featured' : ''}`}
-                >
-                  {index === 1 && (
-                    <span className="plan-featured-badge">mais popular</span>
-                  )}
-                  <div className="plan-card-top">
-                    <div className={`plan-icon ${planIconClass[index]}`}>
-                      <i className={`bi ${planIcons[index]}`} />
-                    </div>
-                    <div className="plan-meta">
-                      <div className="plan-name">{plan.label}</div>
-                      <div className="plan-price">
-                        <span className="plan-price-currency">R$</span>
-                        <span className="plan-price-value">
-                          {(plan.priceInCents / 100).toFixed(2).replace('.', ',')}
-                        </span>
-                        {plan.billingInterval === 'monthly' && (
-                          <span className="plan-price-period">/mês</span>
-                        )}
-                      </div>
+            {overlayStep === 'plans' ? (
+              <>
+                {stripeReady === false && (
+                  <div className="stripe-unavailable-banner">
+                    <i className="bi bi-credit-card-2-front" />
+                    <div>
+                      <strong>Pagamentos indisponíveis</strong>
+                      <p>O sistema de pagamentos está em manutenção. Tente novamente em alguns minutos.</p>
                     </div>
                   </div>
-                  <ul className="plan-benefits">
-                    {plan.benefits.map((benefit) => (
-                      <li key={benefit}>
-                        <i className="bi bi-check2" />
-                        {benefit}
-                      </li>
-                    ))}
-                  </ul>
+                )}
+                <div className="plans-list">
+                  {plans.map((plan, index) => (
+                    <div
+                      key={plan.id}
+                      className={`plan-card ${index === 1 ? 'featured' : ''}`}
+                    >
+                      {index === 1 && (
+                        <span className="plan-featured-badge">mais popular</span>
+                      )}
+                      <div className="plan-card-top">
+                        <div className={`plan-icon ${planIconClass[index]}`}>
+                          <i className={`bi ${planIcons[index]}`} />
+                        </div>
+                        <div className="plan-meta">
+                          <div className="plan-name">{plan.label}</div>
+                          <div className="plan-price">
+                            <span className="plan-price-currency">R$</span>
+                            <span className="plan-price-value">
+                              {(plan.priceInCents / 100).toFixed(2).replace('.', ',')}
+                            </span>
+                            {plan.billingInterval === 'monthly' && (
+                              <span className="plan-price-period">/mês</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <ul className="plan-benefits">
+                        {plan.benefits.map((benefit) => (
+                          <li key={benefit}>
+                            <i className="bi bi-check2" />
+                            {benefit}
+                          </li>
+                        ))}
+                      </ul>
+                      <button
+                        type="button"
+                        className={`btn-subscribe ${index === 1 ? 'primary' : 'outline'}`}
+                        disabled={stripeReady === false}
+                        onClick={() => handlePlanSelect(plan.id)}
+                      >
+                        Escolher {index === 0 ? 'este' : 'plano'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  className="btn-already-have-account"
+                  onClick={closePlans}
+                >
+                  Já tenho uma conta — fazer login
+                </button>
+              </>
+            ) : (
+              <div className="overlay-user-info">
+                {/* Summary of chosen plan */}
+                {pendingPlanId && (() => {
+                  const plan = plans.find(p => p.id === pendingPlanId)!
+                  const idx = plans.indexOf(plan)
+                  return (
+                    <div className="overlay-plan-summary">
+                      <div className={`plan-icon ${planIconClass[idx]}`} style={{ width: 36, height: 36, fontSize: '1rem' }}>
+                        <i className={`bi ${planIcons[idx]}`} />
+                      </div>
+                      <div>
+                        <div className="overlay-plan-summary-name">{plan.label}</div>
+                        <div className="overlay-plan-summary-price">
+                          R$ {(plan.priceInCents / 100).toFixed(2).replace('.', ',')}
+                          {plan.billingInterval === 'monthly' ? '/mês' : ''}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                <form className="overlay-user-info-form" onSubmit={handleUserInfoSubmit} noValidate>
+                  <div className="register-field">
+                    <label className="register-label" htmlFor="intent-name">Nome completo</label>
+                    <input
+                      id="intent-name"
+                      type="text"
+                      className="register-input"
+                      placeholder="Seu nome completo"
+                      value={intentName}
+                      autoComplete="name"
+                      autoFocus
+                      onChange={(e) => setIntentName(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="register-field">
+                    <label className="register-label" htmlFor="intent-email">E-mail</label>
+                    <input
+                      id="intent-email"
+                      type="email"
+                      className="register-input"
+                      placeholder="seu@email.com"
+                      value={intentEmail}
+                      autoComplete="email"
+                      onChange={(e) => setIntentEmail(e.target.value)}
+                    />
+                  </div>
+
+                  {(intentError || subscribeError) && (
+                    <p className="register-error">
+                      <i className="bi bi-exclamation-circle" /> {intentError || subscribeError}
+                    </p>
+                  )}
+
                   <button
-                    type="button"
-                    className={`btn-subscribe ${index === 1 ? 'primary' : 'outline'}`}
-                    disabled={subscribeState === 'loading' || stripeReady === false}
-                    onClick={async () => {
-                      setSubscribeError('')
-                      setSubscribeState('loading')
-                      setSubscribingPlanId(plan.id)
-                      let didFail = false
-                      try {
-                        await onSubscribe(plan.id)
-                      } catch (err) {
-                        didFail = true
-                        const msg = err instanceof Error ? err.message : 'Erro desconhecido ao iniciar o checkout.'
-                        setSubscribeError(msg)
-                        setSubscribeState('error')
-                      } finally {
-                        setSubscribingPlanId(null)
-                        if (!didFail) setSubscribeState('idle')
-                      }
-                    }}
+                    type="submit"
+                    className="btn-login-enter"
+                    disabled={subscribeState === 'loading'}
                   >
-                    {subscribeState === 'loading' && subscribingPlanId === plan.id
-                      ? <><span className="btn-spinner" /> Aguarde...</>
-                      : <>Assinar {index === 0 ? 'agora' : 'plano'}</>
+                    {subscribeState === 'loading' && subscribingPlanId === pendingPlanId
+                      ? <><span className="login-spinner" /> Aguarde...</>
+                      : <><i className="bi bi-lock-fill" style={{ marginRight: '0.4rem' }} />Continuar para o pagamento</>
                     }
                   </button>
-                </div>
-              ))}
-            </div>
+                </form>
 
-            <button
-              type="button"
-              className="btn-already-have-account"
-              onClick={closePlans}
-            >
-              Já tenho uma conta — fazer login
-            </button>
+                <button
+                  type="button"
+                  className="overlay-back-btn"
+                  onClick={() => setOverlayStep('plans')}
+                >
+                  <i className="bi bi-arrow-left" /> Voltar aos planos
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -15,6 +15,7 @@ type ScreenState = 'verifying' | 'form' | 'submitting' | 'error'
 interface SessionInfo {
   email: string
   planId: string
+  fullName?: string
 }
 
 // ── Helpers ────────────────────────────────────────────────
@@ -37,7 +38,7 @@ export function RegisterScreen({ sessionId, planId: planIdFromUrl, onRegistered,
     async function verify() {
       try {
         const res = await fetch(`/api/billing/verify-session?session_id=${encodeURIComponent(sessionId)}`)
-        const data = await res.json() as { ok?: boolean; email?: string; planId?: string; message?: string }
+        const data = await res.json() as { ok?: boolean; email?: string; planId?: string; fullName?: string; message?: string }
 
         if (!res.ok || !data.email) {
           setErrorMsg(data.message ?? 'Não foi possível verificar o pagamento.')
@@ -48,7 +49,9 @@ export function RegisterScreen({ sessionId, planId: planIdFromUrl, onRegistered,
         setSessionInfo({
           email: data.email,
           planId: data.planId ?? planIdFromUrl,
+          fullName: data.fullName ?? undefined,
         })
+        if (data.fullName) setFullName(data.fullName)
         setScreenState('form')
       } catch {
         setErrorMsg('Erro de conexão ao verificar pagamento.')
@@ -185,13 +188,20 @@ export function RegisterScreen({ sessionId, planId: planIdFromUrl, onRegistered,
             <input
               id="reg-name"
               type="text"
-              className="register-input"
+              className={`register-input ${sessionInfo?.fullName ? 'register-input-readonly' : ''}`}
               placeholder="Seu nome completo"
               value={fullName}
               autoComplete="name"
-              autoFocus
-              onChange={(e) => setFullName(e.target.value)}
+              autoFocus={!sessionInfo?.fullName}
+              readOnly={Boolean(sessionInfo?.fullName)}
+              tabIndex={sessionInfo?.fullName ? -1 : undefined}
+              onChange={(e) => { if (!sessionInfo?.fullName) setFullName(e.target.value) }}
             />
+            {sessionInfo?.fullName && (
+              <span className="register-field-hint">
+                <i className="bi bi-lock-fill" /> Confirmado antes do pagamento
+              </span>
+            )}
           </div>
 
           <div className="register-field">

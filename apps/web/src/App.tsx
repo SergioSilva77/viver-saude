@@ -478,7 +478,7 @@ function App() {
     return () => clearInterval(id)
   }, [guardiao24hUntil])
 
-  async function handleSubscribe(planId: PlanId) {
+  async function handleSubscribe(planId: PlanId, userData?: { fullName: string; email: string }) {
     setCheckoutError(null)
 
     // Layer 4: client-side guard — refuse if Stripe is known not configured.
@@ -487,12 +487,19 @@ function App() {
       return
     }
 
+    const email = userData?.email ?? sessionUserEmail
+    const fullName = userData?.fullName
+
     setCheckoutLoading(planId)
     try {
       const res = await fetch('/api/billing/checkout-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planId, ...(sessionUserEmail ? { email: sessionUserEmail } : {}) }),
+        body: JSON.stringify({
+          planId,
+          ...(email ? { email } : {}),
+          ...(fullName ? { fullName } : {}),
+        }),
       })
       const data = await res.json() as { ok?: boolean; url?: string; message?: string; code?: string }
       if (!res.ok || !data.url) {
@@ -553,7 +560,7 @@ function App() {
           setConsultantUsed(session?.consultantUsed ?? false)
           setAuthState('authenticated')
         }}
-        onSubscribe={async (planId) => {
+        onSubscribe={async (planId, userData) => {
           // Layer 4: client-side guard — refuse to call API if Stripe isn't known to be ready.
           // This makes bypass impossible even if backend has a bug.
           if (stripeReady === false) {
@@ -562,7 +569,11 @@ function App() {
           const res = await fetch('/api/billing/checkout-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ planId }),
+            body: JSON.stringify({
+              planId,
+              ...(userData?.email ? { email: userData.email } : {}),
+              ...(userData?.fullName ? { fullName: userData.fullName } : {}),
+            }),
           })
           const data = await res.json() as { ok?: boolean; url?: string; message?: string; code?: string }
           if (!res.ok || !data.url) {

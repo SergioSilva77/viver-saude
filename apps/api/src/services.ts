@@ -76,7 +76,7 @@ export async function registerPendingUser(input: RegisterIntentInput) {
   }
 }
 
-export async function createCheckoutSession(planId: PlanId, customerEmail?: string) {
+export async function createCheckoutSession(planId: PlanId, customerEmail?: string, customerFullName?: string) {
   const stripe = getStripeClient()
   const stripeConf = getStripeConfig()
   const plan = getPlan(planId)
@@ -93,6 +93,7 @@ export async function createCheckoutSession(planId: PlanId, customerEmail?: stri
     metadata: {
       planId,
       app: 'viver-saude',
+      ...(customerFullName ? { fullName: customerFullName } : {}),
     },
     ...(configuredPriceId
       ? {

@@ -1215,6 +1215,101 @@
   background: #eaf3ee;
 }
 
+/* ── Overlay stepper ──────────────────────────────────────── */
+.overlay-stepper {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0 1.25rem 0.75rem;
+  flex-shrink: 0;
+}
+
+.overlay-stepper-step {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #b0c9bf;
+  white-space: nowrap;
+  transition: color 0.2s;
+}
+
+.overlay-stepper-step.active {
+  color: #2e7d5e;
+}
+
+.overlay-stepper-step.done {
+  color: #56a87a;
+}
+
+.overlay-stepper-num {
+  font-size: 0.85rem;
+}
+
+.overlay-stepper-line {
+  flex: 1;
+  height: 1.5px;
+  background: #d5e8df;
+  margin: 0 0.4rem;
+  min-width: 16px;
+}
+
+/* ── Overlay user-info step ───────────────────────────────── */
+.overlay-user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.overlay-plan-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: #eaf4ef;
+  border: 1.5px solid #c8e6d8;
+  border-radius: 14px;
+  padding: 0.75rem 1rem;
+}
+
+.overlay-plan-summary-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1a2e26;
+}
+
+.overlay-plan-summary-price {
+  font-size: 0.82rem;
+  color: #4a7c63;
+  font-weight: 600;
+  margin-top: 0.1rem;
+}
+
+.overlay-user-info-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.overlay-back-btn {
+  background: none;
+  border: none;
+  color: #7a9e91;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0.25rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  align-self: flex-start;
+  transition: color 0.15s;
+}
+
+.overlay-back-btn:hover {
+  color: #2e7d5e;
+}
+
 /* ── Banner 24h MeuGuardião ────────────────────────────────── */
 .guardiao-24h-banner {
   display: flex;
