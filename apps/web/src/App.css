@@ -2572,6 +2572,8 @@
 .register-input-wrap .register-input,
 .register-input-wrap .login-input {
   padding-right: 3rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .register-toggle-pw {
