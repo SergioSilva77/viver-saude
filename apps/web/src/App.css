@@ -1022,10 +1022,97 @@
   font-size: 0.82rem;
   color: #7a9e91;
   text-decoration: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0;
 }
 
 .login-forgot:hover {
   color: #4caf8c;
+}
+
+/* ── Forgot password / reset screens ──────────────────────── */
+.forgot-sent-card {
+  background: #eaf4ef;
+  border: 1.5px solid #c8e6d8;
+  border-radius: 16px;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  color: #2e7d5e;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin: 0 1.5rem;
+}
+
+.forgot-sent-card i {
+  font-size: 1.4rem;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.forgot-sent-card p {
+  margin: 0;
+  color: #4a6258;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: #2e7d5e;
+  font-size: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  font-family: inherit;
+}
+
+.link-btn:hover {
+  color: #1a5c44;
+}
+
+.reset-icon {
+  width: 64px;
+  height: 64px;
+  background: linear-gradient(135deg, #eaf4ef, #d0eddf);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.25rem;
+  font-size: 1.6rem;
+  color: #2e7d5e;
+}
+
+.reset-success-loader {
+  width: 40px;
+  height: 4px;
+  background: #c8e6d8;
+  border-radius: 999px;
+  margin: 1.5rem auto 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.reset-success-loader::after {
+  content: '';
+  position: absolute;
+  left: -100%;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background: #2e7d5e;
+  border-radius: 999px;
+  animation: reset-progress 2.5s linear forwards;
+}
+
+@keyframes reset-progress {
+  from { left: -100%; }
+  to { left: 0%; }
 }
 
 /* ── Spinner ──────────────────────────────────────────────── */

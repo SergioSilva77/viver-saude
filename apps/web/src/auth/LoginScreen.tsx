@@ -7,6 +7,7 @@ import type { PlanId } from '@viver-saude/shared'
 
 type SubscribeState = 'idle' | 'loading' | 'error'
 type OverlayStep = 'plans' | 'user-info'
+type LoginView = 'login' | 'forgot' | 'forgot-sent'
 
 const GUARDIAO_24H_MS = 24 * 60 * 60 * 1000
 
@@ -48,10 +49,15 @@ interface Props {
 }
 
 export function LoginScreen({ onLogin, onSubscribe, successMessage, prefilledEmail, stripeReady = null }: Props) {
+  const [loginView, setLoginView] = useState<LoginView>('login')
   const [loginState, setLoginState] = useState<LoginState>('idle')
   const [email, setEmail] = useState(prefilledEmail ?? '')
   const [password, setPassword] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
+
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [forgotState, setForgotState] = useState<'idle' | 'loading'>('idle')
+  const [forgotError, setForgotError] = useState('')
 
   const [overlayVisible, setOverlayVisible] = useState(false)
   const [overlayEntered, setOverlayEntered] = useState(false)
@@ -186,8 +192,109 @@ export function LoginScreen({ onLogin, onSubscribe, successMessage, prefilledEma
     return () => document.removeEventListener('keydown', handleKey)
   }, [overlayVisible])
 
+  async function handleForgotPassword(e: React.FormEvent) {
+    e.preventDefault()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(forgotEmail.trim())) {
+      setForgotError('Informe um e-mail válido.')
+      return
+    }
+    setForgotError('')
+    setForgotState('loading')
+    try {
+      await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail.trim() }),
+      })
+      // Always show success (API never reveals if email exists)
+      setLoginView('forgot-sent')
+    } catch {
+      setForgotError('Erro de conexão. Tente novamente.')
+    } finally {
+      setForgotState('idle')
+    }
+  }
+
   const devMode = !isSupabaseConfigured()
 
+  // ── Forgot password — sent confirmation ─────────────────
+  if (loginView === 'forgot-sent') {
+    return (
+      <div className="login-screen">
+        <div className="login-brand">
+          <div className="login-logo"><i className="bi bi-envelope-check-fill" /></div>
+          <h1 className="login-app-name">Verifique seu e-mail</h1>
+          <p className="login-tagline">Se este e-mail estiver cadastrado, você receberá um link para redefinir sua senha.</p>
+        </div>
+        <div className="forgot-sent-card">
+          <i className="bi bi-send-check" />
+          <p>Não recebeu? Verifique a pasta de spam ou <button type="button" className="link-btn" onClick={() => { setLoginView('forgot'); setForgotEmail('') }}>tente novamente</button>.</p>
+        </div>
+        <button
+          type="button"
+          className="btn-login-enter"
+          style={{ marginTop: '1rem' }}
+          onClick={() => setLoginView('login')}
+        >
+          Voltar ao login
+        </button>
+      </div>
+    )
+  }
+
+  // ── Forgot password — email form ─────────────────────────
+  if (loginView === 'forgot') {
+    return (
+      <div className="login-screen">
+        <div className="login-brand">
+          <div className="login-logo"><i className="bi bi-key-fill" /></div>
+          <h1 className="login-app-name">Esqueci minha senha</h1>
+          <p className="login-tagline">Digite seu e-mail e enviaremos um link para redefinir sua senha.</p>
+        </div>
+
+        <form className="login-form" onSubmit={handleForgotPassword} noValidate>
+          <div className="login-field">
+            <label className="login-label" htmlFor="forgot-email">E-mail</label>
+            <input
+              id="forgot-email"
+              type="email"
+              className="login-input"
+              placeholder="seu@email.com"
+              value={forgotEmail}
+              autoComplete="email"
+              autoFocus
+              onChange={(e) => setForgotEmail(e.target.value)}
+            />
+          </div>
+
+          {forgotError && (
+            <p className="login-error">
+              <i className="bi bi-exclamation-circle" /> {forgotError}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            className="btn-login-enter"
+            disabled={forgotState === 'loading'}
+          >
+            {forgotState === 'loading' ? <span className="login-spinner" /> : 'Enviar link de redefinição'}
+          </button>
+        </form>
+
+        <button
+          type="button"
+          className="login-forgot"
+          style={{ marginTop: '1rem', background: 'none', border: 'none', cursor: 'pointer' }}
+          onClick={() => setLoginView('login')}
+        >
+          ← Voltar ao login
+        </button>
+      </div>
+    )
+  }
+
+  // ── Main login view ───────────────────────────────────────
   return (
     <div className="login-screen">
       {devMode && (
@@ -253,7 +360,13 @@ export function LoginScreen({ onLogin, onSubscribe, successMessage, prefilledEma
           {loginState === 'loading' ? <span className="login-spinner" /> : 'Entrar'}
         </button>
 
-        <a href="#" className="login-forgot">Esqueci minha senha</a>
+        <button
+          type="button"
+          className="login-forgot"
+          onClick={() => { setForgotEmail(email); setForgotError(''); setLoginView('forgot') }}
+        >
+          Esqueci minha senha
+        </button>
       </form>
 
       <div className="login-divider">

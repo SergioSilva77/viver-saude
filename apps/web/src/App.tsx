@@ -59,6 +59,7 @@ interface RecipeMeta { id: string; title: string; description: string; audience:
 interface RecipeFull extends RecipeMeta { content: string }
 import { LoginScreen } from './auth/LoginScreen'
 import { RegisterScreen } from './auth/RegisterScreen'
+import { ResetPasswordScreen } from './auth/ResetPasswordScreen'
 import { MeuGuardiao } from './guardiao/MeuGuardiao'
 import { HealthProfileEditor } from './health/HealthProfileEditor'
 import { loadHealthProfile, saveHealthProfile, type HealthProfile } from './health/healthProfile'
@@ -353,6 +354,12 @@ function App() {
     return sessionId ? { sessionId, planId } : null
   })
 
+  // Password reset detection (set via ?reset=TOKEN in URL)
+  const [resetToken, setResetToken] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search)
+    return params.get('reset') ?? null
+  })
+
   // Shown on LoginScreen after registration completes
   const [registrationSuccessEmail, setRegistrationSuccessEmail] = useState<string | null>(null)
 
@@ -408,8 +415,8 @@ function App() {
   }, [])
 
   useEffect(() => {
-    // Clear checkout URL params after reading them (keep state in React)
-    if (window.location.search.includes('checkout=')) {
+    // Clear checkout/reset URL params after reading them (keep state in React)
+    if (window.location.search.includes('checkout=') || window.location.search.includes('reset=')) {
       window.history.replaceState({}, '', window.location.pathname)
     }
 
@@ -546,6 +553,19 @@ function App() {
         <div className="auth-splash-logo"><i className="bi bi-heart-pulse-fill" /></div>
         <div className="auth-splash-spinner" />
       </div>
+    )
+  }
+
+  // Password reset screen — token from ?reset=TOKEN in URL
+  if (resetToken) {
+    return (
+      <ResetPasswordScreen
+        token={resetToken}
+        onSuccess={() => {
+          setResetToken(null)
+        }}
+        onBack={() => setResetToken(null)}
+      />
     )
   }
 

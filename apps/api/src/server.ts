@@ -21,6 +21,8 @@ import { config, getStripeConfig, hasStripeConfig, getAiConfig, type StripeFileC
 import { chat, type ChatMessage, type UserProfile } from './ai.js'
 import { recordUsage, getUsageStats, setQuota } from './tokenTracker.js'
 import { listUsers, upsertUser, removeUser, findByEmail } from './userStore.js'
+import { createResetToken, consumeResetToken } from './resetTokenStore.js'
+import { sendPasswordResetLink } from './emailService.js'
 import { listCommunityLinks, upsertCommunityLink, removeCommunityLink, type CommunityPlatform } from './communityStore.js'
 import { listRecipes, listRecipesMeta, getRecipeById, upsertRecipe, removeRecipe } from './recipeStore.js'
 import {
@@ -117,6 +119,15 @@ const stripeSettingsSchema = z.object({
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
+})
+
+const forgotPasswordSchema = z.object({
+  email: z.string().email(),
+})
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(1),
+  password: z.string().min(8).max(128),
 })
 
 const createUserSchema = z.object({
@@ -693,6 +704,56 @@ app.post('/api/auth/login', (req, res) => {
     })
   } catch (error) {
     res.status(400).json({ message: error instanceof Error ? error.message : 'Credenciais inválidas.' })
+  }
+})
+
+// ── Auth: forgot / reset password ─────────────────────────
+app.post('/api/auth/forgot-password', async (req, res) => {
+  try {
+    const { email } = forgotPasswordSchema.parse(req.body)
+    const user = findByEmail(email)
+
+    // Always return 200 to avoid email enumeration — don't reveal if email exists
+    if (!user) {
+      res.json({ ok: true, message: 'Se este e-mail estiver cadastrado, você receberá um link em breve.' })
+      return
+    }
+
+    const token = createResetToken(email)
+    setImmediate(() => {
+      sendPasswordResetLink({
+        to: user.email,
+        fullName: user.fullName || user.email,
+        token,
+      }).catch(() => { /* already logged inside sendPasswordResetLink */ })
+    })
+
+    res.json({ ok: true, message: 'Se este e-mail estiver cadastrado, você receberá um link em breve.' })
+  } catch (error) {
+    res.status(400).json({ message: error instanceof Error ? error.message : 'Erro ao processar solicitação.' })
+  }
+})
+
+app.post('/api/auth/reset-password', async (req, res) => {
+  try {
+    const { token, password } = resetPasswordSchema.parse(req.body)
+    const email = consumeResetToken(token)
+
+    if (!email) {
+      res.status(400).json({ ok: false, message: 'Link inválido ou expirado. Solicite um novo link.' })
+      return
+    }
+
+    const user = findByEmail(email)
+    if (!user) {
+      res.status(404).json({ ok: false, message: 'Usuário não encontrado.' })
+      return
+    }
+
+    upsertUser({ id: user.id, email: user.email, password })
+    res.json({ ok: true, message: 'Senha redefinida com sucesso. Faça login para continuar.' })
+  } catch (error) {
+    res.status(400).json({ message: error instanceof Error ? error.message : 'Erro ao redefinir senha.' })
   }
 })
 
