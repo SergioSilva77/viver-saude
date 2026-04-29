@@ -256,6 +256,24 @@ app.post('/api/billing/checkout-session', async (req, res) => {
 
   try {
     const payload = checkoutSchema.parse(req.body)
+
+    // Prevent duplicate subscription: if this email already holds an active plan, block.
+    if (payload.email) {
+      const existing = findByEmail(payload.email)
+      if (existing?.planIds.includes(payload.planId)) {
+        const expiresIso = existing.planExpiresAt?.[payload.planId]
+        const isActive = !expiresIso || new Date(expiresIso).getTime() > Date.now()
+        if (isActive) {
+          res.status(409).json({
+            ok: false,
+            code: 'already_subscribed',
+            message: 'Este e-mail já possui este plano ativo. Faça login para acessar.',
+          })
+          return
+        }
+      }
+    }
+
     const session = await createCheckoutSession(payload.planId, payload.email, payload.fullName)
     res.status(201).json({ ok: true, sessionId: session.id, url: session.url })
   } catch (error) {
