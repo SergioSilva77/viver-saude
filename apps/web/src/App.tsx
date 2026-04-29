@@ -60,10 +60,11 @@ interface RecipeFull extends RecipeMeta { content: string }
 import { LoginScreen } from './auth/LoginScreen'
 import { RegisterScreen } from './auth/RegisterScreen'
 import { ResetPasswordScreen } from './auth/ResetPasswordScreen'
+import { LinkPlanScreen } from './auth/LinkPlanScreen'
 import { MeuGuardiao } from './guardiao/MeuGuardiao'
 import { HealthProfileEditor } from './health/HealthProfileEditor'
 import { loadHealthProfile, saveHealthProfile, clearHealthProfile, type HealthProfile } from './health/healthProfile'
-import { loadSession, clearSession, updateSession } from './auth/sessionTypes'
+import { loadSession, saveSession, clearSession, updateSession } from './auth/sessionTypes'
 import { clearChats } from './guardiao/chatHistory'
 import { supabase, isSupabaseConfigured } from './lib/supabase'
 import './App.css'
@@ -575,9 +576,30 @@ function App() {
     )
   }
 
-  // Post-payment registration screen — checked BEFORE unauthenticated so that
-  // a brand-new payer (who has no session) lands here instead of LoginScreen.
+  // Post-payment flow — two cases depending on auth state:
+  // 1. Already authenticated → silently link the new plan, no registration needed.
+  // 2. Not authenticated → show RegisterScreen to create account with email + password.
   if (checkoutSession) {
+    if (authState === 'authenticated' && sessionUserId) {
+      return (
+        <LinkPlanScreen
+          sessionId={checkoutSession.sessionId}
+          userId={sessionUserId}
+          onLinked={(planIds, planExpiresAt) => {
+            setCheckoutSession(null)
+            setActivePlans(planIds as PlanId[])
+            // Persist updated plan info to local session
+            const session = loadSession()
+            if (session) {
+              saveSession({ ...session, planIds: planIds as PlanId[], planExpiresAt })
+            }
+            setActiveSection('inicio')
+          }}
+          onBack={() => setCheckoutSession(null)}
+        />
+      )
+    }
+
     return (
       <RegisterScreen
         sessionId={checkoutSession.sessionId}

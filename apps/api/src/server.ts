@@ -327,6 +327,73 @@ app.get('/api/billing/verify-session', async (req, res) => {
   }
 })
 
+// Link a Stripe session to an already-authenticated user (upgrade / add plan)
+app.post('/api/billing/link-session', async (req, res) => {
+  if (!hasStripeConfig()) {
+    res.status(503).json({ ok: false, message: 'O Stripe ainda não está configurado.' })
+    return
+  }
+
+  const { userId, stripeSessionId } = req.body as { userId?: string; stripeSessionId?: string }
+
+  if (!userId || !stripeSessionId) {
+    res.status(400).json({ ok: false, message: 'userId e stripeSessionId são obrigatórios.' })
+    return
+  }
+
+  try {
+    const stripe = getStripeClient()
+    const session = await stripe.checkout.sessions.retrieve(stripeSessionId)
+    const paid = session.payment_status === 'paid' || session.status === 'complete'
+
+    if (!paid) {
+      res.status(400).json({ ok: false, message: 'Pagamento ainda não confirmado.' })
+      return
+    }
+
+    const planId = (session.metadata?.planId ?? 'nivel1') as string
+
+    const users = listUsers()
+    const user = users.find((u) => u.id === userId)
+    if (!user) {
+      res.status(404).json({ ok: false, message: 'Usuário não encontrado.' })
+      return
+    }
+
+    const plan = getPlan(planId as 'nivel1' | 'nivel2' | 'nivel3')
+    const expiresIso = plan.billingInterval === 'monthly'
+      ? (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString() })()
+      : null
+
+    const updatedPlanIds = user.planIds.includes(planId)
+      ? user.planIds
+      : [...user.planIds, planId]
+
+    const subscriptionId = typeof session.subscription === 'string' ? session.subscription : null
+
+    const updated = upsertUser({
+      id: user.id,
+      email: user.email,
+      planIds: updatedPlanIds,
+      planExpiresAt: expiresIso ? { [planId]: expiresIso } : undefined,
+      subscriptionIds: subscriptionId ? { [planId]: subscriptionId } : undefined,
+    })
+
+    const planExpiresAtMs: Record<string, number> = {}
+    for (const [pid, iso] of Object.entries(updated.planExpiresAt ?? {})) {
+      if (iso) planExpiresAtMs[pid] = new Date(iso).getTime()
+    }
+
+    res.json({
+      ok: true,
+      planIds: updated.planIds,
+      planExpiresAt: planExpiresAtMs,
+    })
+  } catch (error) {
+    res.status(400).json({ ok: false, message: error instanceof Error ? error.message : 'Falha ao vincular plano.' })
+  }
+})
+
 app.post('/api/auth/register', async (req, res) => {
   if (!hasStripeConfig()) {
     res.status(503).json({ message: 'O Stripe ainda não está configurado.' })
