@@ -17,9 +17,17 @@ export interface StoredChat {
 
 // ── Constants ──────────────────────────────────────────────
 
-const CHATS_KEY = 'vs_guardiao_chats'
-const ACTIVE_CHAT_KEY = 'vs_guardiao_active_chat'
 const MAX_CHATS = 50
+
+// ── Key helpers (scoped per user) ─────────────────────────
+
+function chatsKey(userId?: string): string {
+  return userId ? `vs_guardiao_chats_${userId}` : 'vs_guardiao_chats'
+}
+
+function activeChatKey(userId?: string): string {
+  return userId ? `vs_guardiao_active_chat_${userId}` : 'vs_guardiao_active_chat'
+}
 
 // ── Helpers ────────────────────────────────────────────────
 
@@ -30,9 +38,9 @@ function deriveTitle(firstUserMessage: string): string {
 
 // ── CRUD ───────────────────────────────────────────────────
 
-export function loadChats(): StoredChat[] {
+export function loadChats(userId?: string): StoredChat[] {
   try {
-    const raw = localStorage.getItem(CHATS_KEY)
+    const raw = localStorage.getItem(chatsKey(userId))
     if (!raw) return []
     return (JSON.parse(raw) as StoredChat[]).sort((a, b) => b.updatedAt - a.updatedAt)
   } catch {
@@ -40,13 +48,13 @@ export function loadChats(): StoredChat[] {
   }
 }
 
-function persistChats(chats: StoredChat[]): void {
+function persistChats(chats: StoredChat[], userId?: string): void {
   // Keep only the most recent MAX_CHATS to avoid unbounded growth.
   const sorted = [...chats].sort((a, b) => b.updatedAt - a.updatedAt)
-  localStorage.setItem(CHATS_KEY, JSON.stringify(sorted.slice(0, MAX_CHATS)))
+  localStorage.setItem(chatsKey(userId), JSON.stringify(sorted.slice(0, MAX_CHATS)))
 }
 
-export function createChat(): StoredChat {
+export function createChat(userId?: string): StoredChat {
   const now = Date.now()
   const chat: StoredChat = {
     id: `chat-${now}`,
@@ -55,13 +63,13 @@ export function createChat(): StoredChat {
     updatedAt: now,
     messages: [],
   }
-  const chats = loadChats()
-  persistChats([chat, ...chats])
+  const chats = loadChats(userId)
+  persistChats([chat, ...chats], userId)
   return chat
 }
 
-export function updateChat(chatId: string, messages: ChatMessage[]): void {
-  const chats = loadChats()
+export function updateChat(chatId: string, messages: ChatMessage[], userId?: string): void {
+  const chats = loadChats(userId)
   const idx = chats.findIndex((c) => c.id === chatId)
   if (idx === -1) return
 
@@ -72,25 +80,31 @@ export function updateChat(chatId: string, messages: ChatMessage[]): void {
     messages,
     updatedAt: Date.now(),
   }
-  persistChats(chats)
+  persistChats(chats, userId)
 }
 
-export function deleteChat(chatId: string): void {
-  const chats = loadChats().filter((c) => c.id !== chatId)
-  persistChats(chats)
+export function deleteChat(chatId: string, userId?: string): void {
+  const chats = loadChats(userId).filter((c) => c.id !== chatId)
+  persistChats(chats, userId)
+}
+
+/** Removes all chat data for a given user (called on logout). */
+export function clearChats(userId?: string): void {
+  localStorage.removeItem(chatsKey(userId))
+  localStorage.removeItem(activeChatKey(userId))
 }
 
 // ── Active chat pointer ─────────────────────────────────────
 
-export function loadActiveChatId(): string | null {
-  return localStorage.getItem(ACTIVE_CHAT_KEY)
+export function loadActiveChatId(userId?: string): string | null {
+  return localStorage.getItem(activeChatKey(userId))
 }
 
-export function saveActiveChatId(chatId: string | null): void {
+export function saveActiveChatId(chatId: string | null, userId?: string): void {
   if (chatId === null) {
-    localStorage.removeItem(ACTIVE_CHAT_KEY)
+    localStorage.removeItem(activeChatKey(userId))
   } else {
-    localStorage.setItem(ACTIVE_CHAT_KEY, chatId)
+    localStorage.setItem(activeChatKey(userId), chatId)
   }
 }
 

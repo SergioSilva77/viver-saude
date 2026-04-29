@@ -127,8 +127,8 @@ function ChatListView({ chats, activeChatId, onSelect, onNew, onDelete }: ChatLi
 // ── Main component ─────────────────────────────────────────
 
 export function MeuGuardiao({ userProfile, userId, userEmail, guardiao24hUntil, onViewPlans }: Props) {
-  const [chats, setChats] = useState<StoredChat[]>(() => loadChats())
-  const [activeChatId, setActiveChatId] = useState<string | null>(() => loadActiveChatId())
+  const [chats, setChats] = useState<StoredChat[]>(() => loadChats(userId))
+  const [activeChatId, setActiveChatId] = useState<string | null>(() => loadActiveChatId(userId))
   const [view, setView] = useState<'chat' | 'list'>('chat')
   const [inputText, setInputText] = useState('')
   const [isThinking, setIsThinking] = useState(false)
@@ -142,18 +142,18 @@ export function MeuGuardiao({ userProfile, userId, userEmail, guardiao24hUntil, 
 
   // If no active chat exists (first launch or all deleted), auto-create one.
   useEffect(() => {
-    const current = loadChats()
+    const current = loadChats(userId)
     if (current.length === 0) {
-      const fresh = createChat()
+      const fresh = createChat(userId)
       setChats([fresh])
       setActiveChatId(fresh.id)
-      saveActiveChatId(fresh.id)
-    } else if (!loadActiveChatId() || !current.find((c) => c.id === loadActiveChatId())) {
+      saveActiveChatId(fresh.id, userId)
+    } else if (!loadActiveChatId(userId) || !current.find((c) => c.id === loadActiveChatId(userId))) {
       const first = current[0]
       setActiveChatId(first.id)
-      saveActiveChatId(first.id)
+      saveActiveChatId(first.id, userId)
     }
-  }, [])
+  }, [userId])
 
   // Scroll to bottom when messages or thinking state changes.
   useEffect(() => {
@@ -168,42 +168,42 @@ export function MeuGuardiao({ userProfile, userId, userEmail, guardiao24hUntil, 
   }, [activeChatId, view])
 
   const refreshChats = useCallback(() => {
-    setChats(loadChats())
-  }, [])
+    setChats(loadChats(userId))
+  }, [userId])
 
   function selectChat(chat: StoredChat) {
     setActiveChatId(chat.id)
-    saveActiveChatId(chat.id)
+    saveActiveChatId(chat.id, userId)
     setView('chat')
     setChatError(null)
   }
 
   function handleNewChat() {
-    const fresh = createChat()
+    const fresh = createChat(userId)
     refreshChats()
     setChats((prev) => [fresh, ...prev])
     setActiveChatId(fresh.id)
-    saveActiveChatId(fresh.id)
+    saveActiveChatId(fresh.id, userId)
     setView('chat')
     setChatError(null)
     setInputText('')
   }
 
   function handleDeleteChat(chatId: string) {
-    deleteChat(chatId)
-    const remaining = loadChats()
+    deleteChat(chatId, userId)
+    const remaining = loadChats(userId)
     setChats(remaining)
 
     if (activeChatId === chatId) {
       if (remaining.length > 0) {
         const next = remaining[0]
         setActiveChatId(next.id)
-        saveActiveChatId(next.id)
+        saveActiveChatId(next.id, userId)
       } else {
-        const fresh = createChat()
+        const fresh = createChat(userId)
         setChats([fresh])
         setActiveChatId(fresh.id)
-        saveActiveChatId(fresh.id)
+        saveActiveChatId(fresh.id, userId)
         setView('chat')
       }
     }
@@ -235,7 +235,7 @@ export function MeuGuardiao({ userProfile, userId, userEmail, guardiao24hUntil, 
     setChatError(null)
 
     // Persist user message immediately so it survives navigation.
-    updateChat(activeChatId, updatedMessages)
+    updateChat(activeChatId, updatedMessages, userId)
 
     try {
       const res = await fetch(`${API_URL}/api/ai/chat`, {
@@ -264,7 +264,7 @@ export function MeuGuardiao({ userProfile, userId, userEmail, guardiao24hUntil, 
       }
 
       const finalMessages = [...updatedMessages, aiMsg]
-      updateChat(activeChatId, finalMessages)
+      updateChat(activeChatId, finalMessages, userId)
       setChats((prev) =>
         prev.map((c) =>
           c.id === activeChatId

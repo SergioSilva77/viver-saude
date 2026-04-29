@@ -62,8 +62,9 @@ import { RegisterScreen } from './auth/RegisterScreen'
 import { ResetPasswordScreen } from './auth/ResetPasswordScreen'
 import { MeuGuardiao } from './guardiao/MeuGuardiao'
 import { HealthProfileEditor } from './health/HealthProfileEditor'
-import { loadHealthProfile, saveHealthProfile, type HealthProfile } from './health/healthProfile'
+import { loadHealthProfile, saveHealthProfile, clearHealthProfile, type HealthProfile } from './health/healthProfile'
 import { loadSession, clearSession, updateSession } from './auth/sessionTypes'
+import { clearChats } from './guardiao/chatHistory'
 import { supabase, isSupabaseConfigured } from './lib/supabase'
 import './App.css'
 
@@ -332,8 +333,8 @@ function App() {
   // Consultant one-time use
   const [consultantUsed, setConsultantUsed] = useState(false)
 
-  // Health profile
-  const [healthProfile, setHealthProfile] = useState<HealthProfile>(loadHealthProfile)
+  // Health profile — loaded per user after login
+  const [healthProfile, setHealthProfile] = useState<HealthProfile>(() => loadHealthProfile(undefined))
   const [showHealthEditor, setShowHealthEditor] = useState(false)
 
   // Cancel subscription modal
@@ -472,6 +473,11 @@ function App() {
 
     return () => listener.subscription.unsubscribe()
   }, [])
+
+  // Reload health profile when the logged-in user changes
+  useEffect(() => {
+    setHealthProfile(loadHealthProfile(sessionUserId))
+  }, [sessionUserId])
 
   // Countdown ticker for 24h MeuGuardião unlock
   useEffect(() => {
@@ -649,10 +655,16 @@ function App() {
   const goToPlans = () => setActiveSection('inicio')
 
   async function handleLogout() {
+    // Clear user-scoped local data before clearing the session
+    clearChats(sessionUserId)
+    clearHealthProfile(sessionUserId)
     clearSession()
+    setHealthProfile(loadHealthProfile(undefined))
     if (isSupabaseConfigured()) {
       await supabase.auth.signOut()
     } else {
+      setSessionUserId(undefined)
+      setSessionUserEmail(undefined)
       setAuthState('unauthenticated')
     }
   }
@@ -972,7 +984,13 @@ function App() {
                   { icon: 'bi-arrow-up-circle', label: 'Fazer upgrade de plano', action: goToPlans },
                   { icon: 'bi-x-circle', label: 'Cancelar assinatura', action: (() => {
                     const monthlyPlan = activePlans.find((pid) => plans.find((p) => p.id === pid)?.billingInterval === 'monthly')
-                    if (!monthlyPlan) return undefined
+                    // nivel1 is one_time — no subscription to cancel
+                    if (!monthlyPlan) {
+                      if (activePlans.length > 0) {
+                        return () => alert('Seu plano atual é de pagamento único e não possui assinatura recorrente para cancelar.')
+                      }
+                      return undefined
+                    }
                     return () => {
                       const label = plans.find((p) => p.id === monthlyPlan)?.label ?? monthlyPlan
                       setCancelModal({ planId: monthlyPlan as PlanId, planLabel: label })
@@ -1090,7 +1108,7 @@ function App() {
           profile={healthProfile}
           onSave={(updated) => {
             setHealthProfile(updated)
-            saveHealthProfile(updated)
+            saveHealthProfile(updated, sessionUserId)
             setShowHealthEditor(false)
           }}
           onClose={() => setShowHealthEditor(false)}

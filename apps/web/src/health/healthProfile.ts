@@ -35,11 +35,13 @@ export const DEFAULT_HEALTH_PROFILE: HealthProfile = {
 
 // ── localStorage ───────────────────────────────────────────
 
-const HEALTH_PROFILE_KEY = 'vs_health_profile'
+function healthProfileKey(userId?: string): string {
+  return userId ? `vs_health_profile_${userId}` : 'vs_health_profile'
+}
 
-export function loadHealthProfile(): HealthProfile {
+export function loadHealthProfile(userId?: string): HealthProfile {
   try {
-    const raw = localStorage.getItem(HEALTH_PROFILE_KEY)
+    const raw = localStorage.getItem(healthProfileKey(userId))
     if (!raw) return { ...DEFAULT_HEALTH_PROFILE }
     return { ...DEFAULT_HEALTH_PROFILE, ...JSON.parse(raw) } as HealthProfile
   } catch {
@@ -47,6 +49,10 @@ export function loadHealthProfile(): HealthProfile {
   }
 }
 
-export function saveHealthProfile(profile: HealthProfile): void {
-  localStorage.setItem(HEALTH_PROFILE_KEY, JSON.stringify(profile))
+export function saveHealthProfile(profile: HealthProfile, userId?: string): void {
+  localStorage.setItem(healthProfileKey(userId), JSON.stringify(profile))
+}
+
+export function clearHealthProfile(userId?: string): void {
+  localStorage.removeItem(healthProfileKey(userId))
 }

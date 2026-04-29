@@ -285,7 +285,12 @@ export async function cancelSubscriptionAtPeriodEnd(userId: string, planId: stri
   if (!user) throw new Error('Usuário não encontrado.')
 
   const subscriptionId = user.subscriptionIds?.[planId]
-  if (!subscriptionId) throw new Error('Nenhuma assinatura recorrente encontrada para este plano.')
+  if (!subscriptionId) {
+    throw new Error(
+      'Este plano não possui assinatura recorrente no Stripe. ' +
+      'Se foi criado manualmente, remova o acesso pelo painel administrativo.'
+    )
+  }
 
   const stripe = getStripeClient()
   await stripe.subscriptions.update(subscriptionId, { cancel_at_period_end: true })
