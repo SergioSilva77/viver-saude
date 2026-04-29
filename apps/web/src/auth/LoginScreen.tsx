@@ -55,6 +55,8 @@ export function LoginScreen({ onLogin, onSubscribe, successMessage, prefilledEma
   const [password, setPassword] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
 
+  const [showPassword, setShowPassword] = useState(false)
+
   const [forgotEmail, setForgotEmail] = useState('')
   const [forgotState, setForgotState] = useState<'idle' | 'loading'>('idle')
   const [forgotError, setForgotError] = useState('')
@@ -335,15 +337,25 @@ export function LoginScreen({ onLogin, onSubscribe, successMessage, prefilledEma
 
         <div className="login-field">
           <label className="login-label" htmlFor="login-password">Senha</label>
-          <input
-            id="login-password"
-            type="password"
-            className="login-input"
-            placeholder="••••••••"
-            value={password}
-            autoComplete="current-password"
-            onChange={(e) => setPassword(e.target.value)}
-          />
+          <div className="register-input-wrap">
+            <input
+              id="login-password"
+              type={showPassword ? 'text' : 'password'}
+              className="login-input"
+              placeholder="••••••••"
+              value={password}
+              autoComplete="current-password"
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <button
+              type="button"
+              className="register-toggle-pw"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+            >
+              <i className={`bi ${showPassword ? 'bi-eye-slash' : 'bi-eye'}`} />
+            </button>
+          </div>
         </div>
 
         {loginState === 'error' && (

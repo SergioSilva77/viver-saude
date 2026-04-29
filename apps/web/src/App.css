@@ -2569,7 +2569,8 @@
   position: relative;
 }
 
-.register-input-wrap .register-input {
+.register-input-wrap .register-input,
+.register-input-wrap .login-input {
   padding-right: 3rem;
 }
 
