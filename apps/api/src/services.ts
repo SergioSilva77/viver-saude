@@ -4,6 +4,7 @@ import { getPlan, plans, type PlanId } from '@viver-saude/shared'
 
 import { config, getStripeConfig, hasStripeConfig, hasSupabaseAdminConfig } from './config.js'
 import { findByEmail, upsertUser } from './userStore.js'
+import { sendRegistrationLink } from './emailService.js'
 
 type RegisterIntentInput = {
   email: string
@@ -138,6 +139,7 @@ export async function applyWebhookCheckoutCompleted(session: Stripe.Checkout.Ses
   }
 
   const planId = (session.metadata?.planId as PlanId | undefined) ?? 'nivel1'
+  const fullName = (session.metadata?.fullName as string | undefined) ?? session.customer_details?.name ?? 'Cliente'
   const expiresAt = calcPlanExpiry(planId)
 
   // ── 1. Update local users.json (works without Supabase) ──
@@ -164,13 +166,28 @@ export async function applyWebhookCheckoutCompleted(session: Stripe.Checkout.Ses
     })
   }
 
-  // ── 2. Update Supabase profile (if configured) ────────────
+  // ── 2. Send registration e-mail (fire-and-forget) ────────
+  // Only send if the user hasn't registered yet (no local account found).
+  // This acts as a safety net: if the user closes the browser after paying,
+  // they receive a link to complete registration via email.
+  if (!localUser) {
+    setImmediate(() => {
+      sendRegistrationLink({
+        to: email,
+        fullName,
+        sessionId: session.id,
+        planId,
+      }).catch(() => { /* already logged inside sendRegistrationLink */ })
+    })
+  }
+
+  // ── 3. Update Supabase profile (if configured) ────────────
   if (!hasSupabaseAdminConfig()) {
     return {
       persisted: localUser !== null,
       message: localUser
         ? 'Pagamento confirmado e acesso liberado.'
-        : 'Webhook recebido. Usuário não encontrado no sistema local.',
+        : 'Webhook recebido. E-mail de ativação enviado (se SMTP configurado).',
     }
   }
 

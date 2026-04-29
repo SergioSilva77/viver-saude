@@ -549,6 +549,24 @@ function App() {
     )
   }
 
+  // Post-payment registration screen — checked BEFORE unauthenticated so that
+  // a brand-new payer (who has no session) lands here instead of LoginScreen.
+  if (checkoutSession) {
+    return (
+      <RegisterScreen
+        sessionId={checkoutSession.sessionId}
+        planId={checkoutSession.planId}
+        onRegistered={(email) => {
+          // Registration done — clear checkout state and go to login.
+          // The user must sign in with the credentials they just created.
+          setCheckoutSession(null)
+          setRegistrationSuccessEmail(email)
+        }}
+        onBack={() => setCheckoutSession(null)}
+      />
+    )
+  }
+
   if (authState === 'unauthenticated') {
     return (
       <LoginScreen
@@ -590,23 +608,6 @@ function App() {
         }
         prefilledEmail={registrationSuccessEmail ?? undefined}
         stripeReady={stripeReady}
-      />
-    )
-  }
-
-  // Post-payment registration screen
-  if (checkoutSession) {
-    return (
-      <RegisterScreen
-        sessionId={checkoutSession.sessionId}
-        planId={checkoutSession.planId}
-        onRegistered={(email) => {
-          // Registration done — clear checkout state and go to login.
-          // The user must sign in with the credentials they just created.
-          setCheckoutSession(null)
-          setRegistrationSuccessEmail(email)
-        }}
-        onBack={() => setCheckoutSession(null)}
       />
     )
   }

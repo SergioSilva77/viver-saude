@@ -47,6 +47,32 @@ export const config = {
   adminApiSecret: process.env.ADMIN_API_SECRET ?? 'vs-admin-dev',
 }
 
+// ── Email (SMTP) config ────────────────────────────────────
+
+export interface SmtpConfig {
+  host: string
+  port: number
+  secure: boolean
+  user: string
+  pass: string
+  from: string
+}
+
+export function getSmtpConfig(): SmtpConfig | null {
+  const host = process.env.SMTP_HOST ?? ''
+  const user = process.env.SMTP_USER ?? ''
+  const pass = process.env.SMTP_PASS ?? ''
+  if (!host || !user || !pass) return null
+  return {
+    host,
+    port: Number(process.env.SMTP_PORT ?? 587),
+    secure: process.env.SMTP_SECURE === 'true',
+    user,
+    pass,
+    from: process.env.SMTP_FROM ?? user,
+  }
+}
+
 // ── Dynamic Stripe config ──────────────────────────────────
 // Priority: env vars → .stripe-config.json → empty string
 // Read at call time so admin-panel updates take effect without restart.
