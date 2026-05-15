@@ -15,6 +15,7 @@
     "@viver-saude/shared": "0.1.0",
     "bootstrap": "^5.3.8",
     "bootstrap-icons": "^1.13.1",
+    "marked": "^18.0.2",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-markdown": "^10.1.0",

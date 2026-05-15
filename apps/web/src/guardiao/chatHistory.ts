@@ -39,11 +39,6 @@ function deriveTitle(firstUserMessage: string): string {
 // ── CRUD ───────────────────────────────────────────────────
 
 export function loadChats(userId?: string): StoredChat[] {
-  // #region agent log
-  const k = chatsKey(userId)
-  const rawDbg = localStorage.getItem(k)
-  fetch('http://127.0.0.1:7916/ingest/aeb5bc6c-ecce-4cef-b9f7-c7923c915a04',{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify({sessionId:'9dce5f',hypothesisId:'A',location:'chatHistory.ts:loadChats',message:'loadChats called',data:{userIdParam:userId,keyUsed:k,hasData:Boolean(rawDbg),unscoped:userId===undefined},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   try {
     const raw = localStorage.getItem(chatsKey(userId))
     if (!raw) return []

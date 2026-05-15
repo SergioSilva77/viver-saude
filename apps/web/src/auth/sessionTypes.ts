@@ -5,6 +5,8 @@ import type { PlanId } from '@viver-saude/shared'
 export interface Session {
   userId: string
   email: string
+  /** Display name (from backend StoredUser.fullName). May be empty for legacy data. */
+  fullName?: string
   /** All plan levels granted to this user. */
   planIds: PlanId[]
   expiresAt: number

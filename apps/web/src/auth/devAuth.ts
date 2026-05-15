@@ -13,6 +13,7 @@ export interface DevAuthResult {
   ok: boolean
   userId?: string
   email?: string
+  fullName?: string
   planIds?: PlanId[]
   /** Per-plan expiry timestamps in ms (ISO strings converted from API). */
   planExpiresAt?: Record<string, number>
@@ -32,6 +33,7 @@ export async function devAuthenticate(email: string, password: string): Promise<
       message?: string
       userId?: string
       email?: string
+      fullName?: string
       planIds?: string[]
       planExpiresAt?: Record<string, string>
     }
@@ -50,6 +52,7 @@ export async function devAuthenticate(email: string, password: string): Promise<
       ok: true,
       userId: data.userId,
       email: data.email,
+      fullName: data.fullName,
       planIds: (data.planIds ?? []) as PlanId[],
       planExpiresAt,
     }

@@ -766,6 +766,7 @@ app.post('/api/auth/login', (req, res) => {
       ok: true,
       userId: user.id,
       email: user.email,
+      fullName: user.fullName ?? '',
       planIds: user.planIds,
       planExpiresAt: user.planExpiresAt ?? {},
     })

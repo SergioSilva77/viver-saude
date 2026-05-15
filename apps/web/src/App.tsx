@@ -326,6 +326,7 @@ function App() {
   const [activeSection, setActiveSection] = useState<AppSection>('inicio')
   const [sessionUserId, setSessionUserId] = useState<string | undefined>(undefined)
   const [sessionUserEmail, setSessionUserEmail] = useState<string | undefined>(undefined)
+  const [sessionUserName, setSessionUserName] = useState<string>('')
 
   // 24h MeuGuardião unlock state
   const [guardiao24hUntil, setGuardiao24hUntil] = useState<number | null>(null)
@@ -437,6 +438,7 @@ function App() {
         setConsultantUsed(session.consultantUsed ?? false)
         setSessionUserId(session.userId)
         setSessionUserEmail(session.email)
+        setSessionUserName(session.fullName ?? '')
         setAuthState('authenticated')
       } else {
         setAuthState('unauthenticated')
@@ -451,6 +453,7 @@ function App() {
         setActivePlans(resolvedPlans)
         setSessionUserId(data.session.user.id)
         setSessionUserEmail(data.session.user.email ?? undefined)
+        setSessionUserName((data.session.user.user_metadata?.full_name as string | undefined) ?? '')
         const session = loadSession()
         setGuardiao24hUntil(session?.guardiao24hUnlockedUntil ?? null)
         setConsultantUsed(session?.consultantUsed ?? false)
@@ -479,6 +482,25 @@ function App() {
   useEffect(() => {
     setHealthProfile(loadHealthProfile(sessionUserId))
   }, [sessionUserId])
+
+  // Periodic session expiration check — forces logout if session expired while app is open
+  useEffect(() => {
+    if (authState !== 'authenticated') return
+    function checkExpiration() {
+      const current = loadSession()
+      if (!current) {
+        // Session was cleared or expired — force logout
+        setSessionUserId(undefined)
+        setSessionUserEmail(undefined)
+        setSessionUserName('')
+        setActivePlans([])
+        setAuthState('unauthenticated')
+      }
+    }
+    checkExpiration()
+    const id = setInterval(checkExpiration, 60_000)
+    return () => clearInterval(id)
+  }, [authState])
 
   // Countdown ticker for 24h MeuGuardião unlock
   useEffect(() => {
@@ -619,18 +641,17 @@ function App() {
     return (
       <LoginScreen
         onLogin={(planIds) => {
-          // #region agent log
-          fetch('http://127.0.0.1:7916/ingest/aeb5bc6c-ecce-4cef-b9f7-c7923c915a04',{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify({sessionId:'9dce5f',hypothesisId:'A',location:'App.tsx:onLogin',message:'onLogin BEFORE update',data:{sessionUserId_before:sessionUserId,planIds,sessionFromLS:loadSession()},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
           setRegistrationSuccessEmail(null)
           setActivePlans(planIds)
           const session = loadSession()
+          if (session) {
+            setSessionUserId(session.userId)
+            setSessionUserEmail(session.email)
+            setSessionUserName(session.fullName ?? '')
+          }
           setGuardiao24hUntil(session?.guardiao24hUnlockedUntil ?? null)
           setConsultantUsed(session?.consultantUsed ?? false)
           setAuthState('authenticated')
-          // #region agent log
-          fetch('http://127.0.0.1:7916/ingest/aeb5bc6c-ecce-4cef-b9f7-c7923c915a04',{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify({sessionId:'9dce5f',hypothesisId:'A',location:'App.tsx:onLogin',message:'onLogin AFTER - sessionUserId NOT updated',data:{sessionUserId_still:sessionUserId,sessionUserIdFromLS:session?.userId},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
         }}
         onSubscribe={async (planId, userData) => {
           // Layer 4: client-side guard — refuse to call API if Stripe isn't known to be ready.
@@ -688,11 +709,13 @@ function App() {
     clearHealthProfile(sessionUserId)
     clearSession()
     setHealthProfile(loadHealthProfile(undefined))
+    setSessionUserId(undefined)
+    setSessionUserEmail(undefined)
+    setSessionUserName('')
+    setActivePlans([])
     if (isSupabaseConfigured()) {
       await supabase.auth.signOut()
     } else {
-      setSessionUserId(undefined)
-      setSessionUserEmail(undefined)
       setAuthState('unauthenticated')
     }
   }
@@ -1001,7 +1024,10 @@ function App() {
             <>
               <div>
                 <div className="profile-avatar"><i className="bi bi-person-fill"></i></div>
-                <div className="profile-name">Meu Perfil</div>
+                <div className="profile-name">{sessionUserName || 'Meu Perfil'}</div>
+                {sessionUserEmail && (
+                  <div className="profile-email">{sessionUserEmail}</div>
+                )}
                 <div className="profile-plan">{planLabel}</div>
               </div>
               <ul className="menu-list">

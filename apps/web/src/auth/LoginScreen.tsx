@@ -158,6 +158,7 @@ export function LoginScreen({ onLogin, onSubscribe, successMessage, prefilledEma
       saveSession({
         userId: result.userId!,
         email: result.email!,
+        fullName: result.fullName,
         planIds: resolvedPlanIds,
         planExpiresAt: result.planExpiresAt,
         guardiao24hUnlockedUntil: buildGuardiao24hTimestamp(resolvedPlanIds),
@@ -180,6 +181,7 @@ export function LoginScreen({ onLogin, onSubscribe, successMessage, prefilledEma
     saveSession({
       userId: data.user.id,
       email: data.user.email ?? email,
+      fullName: (data.user.user_metadata?.full_name as string | undefined) ?? '',
       planIds: resolvedPlanIds,
       guardiao24hUnlockedUntil: buildGuardiao24hTimestamp(resolvedPlanIds),
     })

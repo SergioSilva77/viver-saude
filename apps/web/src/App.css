@@ -517,6 +517,13 @@
   margin-top: 0.15rem;
 }
 
+.profile-email {
+  text-align: center;
+  font-size: 0.8rem;
+  color: #6b8a7e;
+  margin-top: 0.1rem;
+}
+
 .menu-list {
   list-style: none;
   padding: 0;
