@@ -301,13 +301,6 @@ export function LoginScreen({ onLogin, onSubscribe, successMessage, prefilledEma
   // ── Main login view ───────────────────────────────────────
   return (
     <div className="login-screen">
-      {devMode && (
-        <div className="login-dev-banner">
-          <i className="bi bi-cone-striped" />
-          Modo desenvolvimento — autenticação local (painel admin)
-        </div>
-      )}
-
       {successMessage && (
         <div className="login-success-banner">
           <i className="bi bi-check-circle-fill" />
