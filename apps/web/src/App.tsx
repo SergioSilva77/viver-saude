@@ -620,7 +620,7 @@ function App() {
       <LoginScreen
         onLogin={(planIds) => {
           // #region agent log
-          fetch('http://127.0.0.1:7916/ingest/aeb5bc6c-ecce-4cef-b9f7-c7923c915a04',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9dce5f'},body:JSON.stringify({sessionId:'9dce5f',hypothesisId:'A',location:'App.tsx:onLogin',message:'onLogin callback fired - state BEFORE update',data:{sessionUserId_before:sessionUserId,planIds,sessionFromLS:loadSession()},timestamp:Date.now()})}).catch(()=>{});
+          fetch('http://127.0.0.1:7916/ingest/aeb5bc6c-ecce-4cef-b9f7-c7923c915a04',{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify({sessionId:'9dce5f',hypothesisId:'A',location:'App.tsx:onLogin',message:'onLogin BEFORE update',data:{sessionUserId_before:sessionUserId,planIds,sessionFromLS:loadSession()},timestamp:Date.now()})}).catch(()=>{});
           // #endregion
           setRegistrationSuccessEmail(null)
           setActivePlans(planIds)
@@ -629,7 +629,7 @@ function App() {
           setConsultantUsed(session?.consultantUsed ?? false)
           setAuthState('authenticated')
           // #region agent log
-          fetch('http://127.0.0.1:7916/ingest/aeb5bc6c-ecce-4cef-b9f7-c7923c915a04',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9dce5f'},body:JSON.stringify({sessionId:'9dce5f',hypothesisId:'A',location:'App.tsx:onLogin',message:'onLogin DID NOT call setSessionUserId - state stays stale',data:{sessionUserId_still:sessionUserId,sessionUserIdFromLS:session?.userId},timestamp:Date.now()})}).catch(()=>{});
+          fetch('http://127.0.0.1:7916/ingest/aeb5bc6c-ecce-4cef-b9f7-c7923c915a04',{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify({sessionId:'9dce5f',hypothesisId:'A',location:'App.tsx:onLogin',message:'onLogin AFTER - sessionUserId NOT updated',data:{sessionUserId_still:sessionUserId,sessionUserIdFromLS:session?.userId},timestamp:Date.now()})}).catch(()=>{});
           // #endregion
         }}
         onSubscribe={async (planId, userData) => {

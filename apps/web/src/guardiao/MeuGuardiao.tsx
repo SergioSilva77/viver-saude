@@ -128,7 +128,7 @@ function ChatListView({ chats, activeChatId, onSelect, onNew, onDelete }: ChatLi
 
 export function MeuGuardiao({ userProfile, userId, userEmail, guardiao24hUntil, onViewPlans }: Props) {
   // #region agent log
-  fetch('http://127.0.0.1:7916/ingest/aeb5bc6c-ecce-4cef-b9f7-c7923c915a04',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'9dce5f'},body:JSON.stringify({sessionId:'9dce5f',hypothesisId:'A',location:'MeuGuardiao.tsx:render',message:'MeuGuardiao rendered with props',data:{userId,userEmail,userIdIsUndefined:userId===undefined},timestamp:Date.now()})}).catch(()=>{});
+  fetch('http://127.0.0.1:7916/ingest/aeb5bc6c-ecce-4cef-b9f7-c7923c915a04',{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify({sessionId:'9dce5f',hypothesisId:'A',location:'MeuGuardiao.tsx:render',message:'MeuGuardiao rendered',data:{userId,userEmail,userIdIsUndefined:userId===undefined},timestamp:Date.now()})}).catch(()=>{});
   // #endregion
   const [chats, setChats] = useState<StoredChat[]>(() => loadChats(userId))
   const [activeChatId, setActiveChatId] = useState<string | null>(() => loadActiveChatId(userId))
