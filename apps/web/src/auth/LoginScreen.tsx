@@ -219,7 +219,6 @@ export function LoginScreen({ onLogin, onSubscribe, successMessage, prefilledEma
     }
   }
 
-  const devMode = !isSupabaseConfigured()
 
   // ── Forgot password — sent confirmation ─────────────────
   if (loginView === 'forgot-sent') {
